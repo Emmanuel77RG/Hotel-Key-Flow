@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:15
+    build:
+      context: .
+      dockerfile: Dockerfile.db
     container_name: Hotel_KeyFlow
     restart: always
     environment:
@@ -13,4 +15,4 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
+  postgres_data:
