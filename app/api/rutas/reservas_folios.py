@@ -35,11 +35,5 @@ def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
         )
 
     # OPERACIÓN CRUD
-
-    # Si pasa todas las validaciones, se procesa la reserva en la base de datos
     nueva_reserva = crud_reservas_folios.crear_reserva(db=db, reserva=reserva)
-    
-    # Actualización en cadena: Bloquear la habitación
-    # crud_habitaciones.actualizar_estado_habitacion(db, habitacion_id=reserva.habitacion_id, estado="Ocupada")
-
     return nueva_reserva
