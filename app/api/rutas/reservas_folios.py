@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
 from app.schemas.reservas_folios import ReservaCrear, ReservaRespuesta
-from app.crud import crud_reservas_folios
+from app.crud import crud_reservas_folios, crud_habitaciones
 
 router = APIRouter()
 
@@ -13,4 +13,33 @@ def listar_reservas(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 
 @router.post("/", response_model=ReservaRespuesta, summary="Crear una reserva")
 def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
-    return crud_reservas_folios.crear_reserva(db=db, reserva=reserva)
+    
+    # Lógica de negocio (F1SP3)
+    
+    # Validación de coherencia cronológica
+    if reserva.fecha_salida <= reserva.fecha_entrada:
+        raise HTTPException(
+            status_code=400, 
+            detail="Error de lógica: La fecha de salida debe ser posterior a la fecha de entrada."
+        )
+
+    # Validación de disponibilidad de la habitación
+    habitacion = crud_habitaciones.obtener_habitacion(db, habitacion_id=reserva.habitacion_id)
+    if not habitacion:
+        raise HTTPException(status_code=404, detail="La habitación solicitada no existe.")
+    
+    if habitacion.estado != "Disponible":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"La habitación {habitacion.numero} actualmente se encuentra {habitacion.estado}."
+        )
+
+    # OPERACIÓN CRUD
+
+    # Si pasa todas las validaciones, se procesa la reserva en la base de datos
+    nueva_reserva = crud_reservas_folios.crear_reserva(db=db, reserva=reserva)
+    
+    # Actualización en cadena: Bloquear la habitación
+    # crud_habitaciones.actualizar_estado_habitacion(db, habitacion_id=reserva.habitacion_id, estado="Ocupada")
+
+    return nueva_reserva
