@@ -3,10 +3,9 @@ from app.models.reservas_folios import ReservaFolio
 from app.schemas.reservas_folios import ReservaCrear
 from app.models.habitaciones import Habitacion
 
-# F1SP4 (CHECK-IN Y FOLIOS)
+# Creación del CRUD - F1SP3
 
 def crear_reserva(db: Session, reserva: ReservaCrear):
-    # Creamos el objeto solo con los campos directos de la tabla reservas_folios
     db_reserva = ReservaFolio(
         fecha_entrada=reserva.fecha_entrada,
         fecha_salida=reserva.fecha_salida,
@@ -16,9 +15,8 @@ def crear_reserva(db: Session, reserva: ReservaCrear):
         id_huesped=reserva.id_huesped
     )
     db.add(db_reserva)
-    db.flush() # Asigna el id_reserva sin cerrar la transacción todavía
+    db.flush() 
 
-    # Asociamos la habitación mediante la relación de la tabla intermedia
     if reserva.id_habitacion:
         habitacion = db.query(Habitacion).filter(Habitacion.id_habitacion == reserva.id_habitacion).first()
         if habitacion:
@@ -43,8 +41,9 @@ def actualizar_estado_reserva(db: Session, reserva_id: int, nuevo_estado: str):
         db.refresh(reserva)
     return reserva
 
+# F1SP4 - Programar el Check-in
+
 def abrir_cuenta_folio(db: Session, reserva_id: int):
-    # En tu diseño, abrir el folio es actualizar la misma tabla
     reserva = db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
     if reserva:
         reserva.estado_folio = "Abierto"

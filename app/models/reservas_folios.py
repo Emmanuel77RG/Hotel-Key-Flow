@@ -3,7 +3,7 @@ from datetime import datetime
 from app.db.database import Base
 from sqlalchemy.orm import relationship
 
-# Tabla intermedia exacta del DDL
+# Lógica de Reservas - F1SP3
 reservas_habitaciones = Table(
     "reservas_habitaciones",
     Base.metadata,

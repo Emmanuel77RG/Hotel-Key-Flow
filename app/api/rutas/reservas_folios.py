@@ -39,29 +39,23 @@ def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
     nueva_reserva = crud_reservas_folios.crear_reserva(db=db, reserva=reserva)
     return nueva_reserva
 
-# F1SP4 - CHECK-IN Y FOLIO
 
+# F1SP4 - Programar el Check-in
 @router.post("/{reserva_id}/checkin", summary="Realizar Check-in y generar Cuenta Folio (F1SP4)")
 def realizar_checkin(reserva_id: int, db: Session = Depends(get_db)):
     
-    # 1. Validar que la reserva exista
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
         raise HTTPException(status_code=404, detail="Reserva no encontrada.")
-    
-    # 2. Validar que no se haya hecho check-in antes
+
     if reserva.estado_reserva not in ["Pendiente", "Confirmada"]:
         raise HTTPException(
             status_code=400, 
             detail=f"No se puede hacer check-in. La reserva está '{reserva.estado_reserva}'."
         )
-
-    # 3. Actualizar la reserva a estado Activa (Check-in)
     reserva_actualizada = crud_reservas_folios.actualizar_estado_reserva(
         db, reserva_id=reserva_id, nuevo_estado="Activa"
     )
-
-    # 4. Generar la Cuenta Folio (Cambiando el estado_folio a "Abierto")
     crud_reservas_folios.abrir_cuenta_folio(db=db, reserva_id=reserva_id)
 
     return {
