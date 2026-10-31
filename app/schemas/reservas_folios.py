@@ -11,7 +11,7 @@ class ReservaFolioBase(BaseModel):
     id_huesped: int
 
 class ReservaCrear(ReservaFolioBase):
-    pass
+    id_habitacion: int
 
 class ReservaRespuesta(ReservaFolioBase):
     id_reserva: int

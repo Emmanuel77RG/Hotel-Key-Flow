@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, Date, String, DateTime, ForeignKey, Table
 from datetime import datetime
 from app.db.database import Base
+from sqlalchemy.orm import relationship
 
 # Tabla intermedia exacta del DDL
 reservas_habitaciones = Table(
@@ -22,3 +23,4 @@ class ReservaFolio(Base):
     id_huesped = Column(Integer, ForeignKey("huespedes.id_huesped"), nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    habitaciones = relationship("Habitacion", secondary=reservas_habitaciones, backref="reservas")

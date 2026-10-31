@@ -23,3 +23,7 @@ def actualizar_estado_habitacion(db: Session, id_habitacion: int, estado_update:
         db.commit()
         db.refresh(habitacion_db)
     return habitacion_db
+
+def obtener_habitacion(db: Session, habitacion_id: int):
+    from app.models.habitaciones import Habitacion 
+    return db.query(Habitacion).filter(Habitacion.id_habitacion == habitacion_id).first()
