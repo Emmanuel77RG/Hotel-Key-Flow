@@ -8,6 +8,9 @@ def obtener_huespedes(db: Session, skip: int = 0, limit: int = 100):
 def obtener_huesped(db: Session, id_huesped: int):
     return db.query(Huesped).filter(Huesped.id_huesped == id_huesped).first()
 
+def obtener_huesped_por_documento(db: Session, documento_identidad: str):
+    return db.query(Huesped).filter(Huesped.documento_identidad == documento_identidad).first()
+
 def crear_huesped(db: Session, huesped: HuespedCrear):
     db_huesped = Huesped(**huesped.model_dump())
     db.add(db_huesped)

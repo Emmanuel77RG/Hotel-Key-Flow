@@ -383,8 +383,11 @@ class PanelPrincipal(ctk.CTk):
         try:
             respuesta = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
             if respuesta.status_code == 200:
-                for hab in respuesta.json():
+                lista_habs = respuesta.json()
+                for hab in lista_habs:
                     self.crear_tarjeta_habitacion(hab)
+                if hasattr(self, "actualizar_combo_habitaciones_reserva"):
+                    self.actualizar_combo_habitaciones_reserva(lista_habs)
         except requests.exceptions.ConnectionError:
             pass
 
@@ -505,6 +508,24 @@ class PanelPrincipal(ctk.CTk):
         ctk.CTkLabel(frame_hdr_h, text="Directorio de Huéspedes", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left")
         ctk.CTkButton(frame_hdr_h, text="Refrescar", width=85, height=24, command=self.cargar_huespedes).pack(side="right")
 
+        frame_busqueda_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
+        frame_busqueda_h.pack(fill="x", padx=10, pady=2)
+        self.entry_buscar_huesped = ctk.CTkEntry(
+            frame_busqueda_h,
+            placeholder_text="Buscar por nombre o documento...",
+            height=26
+        )
+        self.entry_buscar_huesped.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        self.entry_buscar_huesped.bind("<KeyRelease>", lambda _e: self.cargar_huespedes())
+        ctk.CTkButton(
+            frame_busqueda_h,
+            text="Limpiar",
+            width=65,
+            height=26,
+            fg_color="gray40",
+            command=self.limpiar_busqueda_huesped
+        ).pack(side="right")
+
         self.frame_lista_huespedes = ctk.CTkScrollableFrame(frame_huesped, height=180)
         self.frame_lista_huespedes.pack(fill="both", expand=True, padx=8, pady=5)
         
@@ -512,7 +533,16 @@ class PanelPrincipal(ctk.CTk):
         frame_res = ctk.CTkFrame(tab_rec)
         frame_res.pack(side="right", fill="both", expand=True, padx=(5, 10), pady=10)
         
-        ctk.CTkLabel(frame_res, text="Gestión de Reservas", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 6))
+        ctk.CTkLabel(frame_res, text="Gestión de Reservas", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 4))
+
+        self.combo_r_hab = ctk.CTkComboBox(
+            frame_res,
+            width=300,
+            values=["Seleccione una habitación..."],
+            command=self.al_seleccionar_combo_habitacion
+        )
+        self.combo_r_hab.set("Seleccione una habitación...")
+        self.combo_r_hab.pack(pady=3)
 
         frame_inputs_res = ctk.CTkFrame(frame_res, fg_color="transparent")
         frame_inputs_res.pack(pady=2)
@@ -528,7 +558,7 @@ class PanelPrincipal(ctk.CTk):
 
         ctk.CTkButton(frame_res, text="Crear Reserva", width=200, command=self.crear_reserva).pack(pady=6)
         
-        ctk.CTkLabel(frame_res, text="Operación de Recepción (Check-in / Check-out)", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(6, 3))
+        ctk.CTkLabel(frame_res, text="Operación de Recepción (Check-in / Check-out / Cancelar)", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(6, 3))
         self.entry_checkin_id = ctk.CTkEntry(frame_res, width=180, placeholder_text="ID de Reserva")
         self.entry_checkin_id.pack(pady=3)
 
@@ -536,20 +566,28 @@ class PanelPrincipal(ctk.CTk):
         frame_btns_op.pack(pady=4)
         ctk.CTkButton(
             frame_btns_op,
-            text="Check-in & Abrir Folio",
-            width=155,
+            text="Check-in & Folio",
+            width=125,
             fg_color="#2E7D32",
             hover_color="#1b5e20",
             command=self.ejecutar_checkin
-        ).pack(side="left", padx=5)
+        ).pack(side="left", padx=4)
         ctk.CTkButton(
             frame_btns_op,
-            text="Ejecutar Check-out",
-            width=155,
+            text="Check-out",
+            width=110,
             fg_color="#E65100",
             hover_color="#BF360C",
             command=self.ejecutar_checkout
-        ).pack(side="left", padx=5)
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            frame_btns_op,
+            text="Cancelar Reserva",
+            width=125,
+            fg_color="#C62828",
+            hover_color="#8E0000",
+            command=self.ejecutar_cancelar_reserva
+        ).pack(side="left", padx=4)
 
         frame_hdr_r = ctk.CTkFrame(frame_res, fg_color="transparent")
         frame_hdr_r.pack(fill="x", padx=10, pady=(6, 2))
@@ -561,6 +599,7 @@ class PanelPrincipal(ctk.CTk):
 
         self.cargar_huespedes()
         self.cargar_reservas()
+        self.actualizar_combo_habitaciones_reserva()
 
     def construir_pestana_folios(self):
         tab_fol = self.tabview.tab("Facturación y Folios")
@@ -595,16 +634,61 @@ class PanelPrincipal(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    def limpiar_busqueda_huesped(self):
+        if hasattr(self, "entry_buscar_huesped"):
+            self.entry_buscar_huesped.delete(0, "end")
+            self.cargar_huespedes()
+
+    def actualizar_combo_habitaciones_reserva(self, lista_habs=None):
+        if not hasattr(self, "combo_r_hab"):
+            return
+        try:
+            if lista_habs is None:
+                resp = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
+                if resp.status_code == 200:
+                    lista_habs = resp.json()
+                else:
+                    return
+            opciones = [
+                f"ID {h['id_habitacion']} - Hab. {h['numero_habitacion']} ({h['tipo']} - ${float(h.get('precio_base', 0)):.0f} [{h['estado']}])"
+                for h in lista_habs
+            ]
+            if opciones:
+                self.combo_r_hab.configure(values=opciones)
+            else:
+                self.combo_r_hab.configure(values=["Sin habitaciones registradas"])
+        except requests.exceptions.ConnectionError:
+            pass
+
+    def al_seleccionar_combo_habitacion(self, opcion_seleccionada: str):
+        # Extrae el ID numérico del formato "ID X - Hab. Y..."
+        if opcion_seleccionada.startswith("ID "):
+            try:
+                id_hab = opcion_seleccionada.split(" - ")[0].replace("ID ", "").strip()
+                self.entry_r_hab_id.delete(0, "end")
+                self.entry_r_hab_id.insert(0, id_hab)
+            except Exception:
+                pass
+
     def cargar_huespedes(self):
         if not hasattr(self, "frame_lista_huespedes"):
             return
         for widget in self.frame_lista_huespedes.winfo_children():
             widget.destroy()
 
+        filtro = ""
+        if hasattr(self, "entry_buscar_huesped"):
+            filtro = self.entry_buscar_huesped.get().strip().lower()
+
         try:
             resp = requests.get(f"{self.url_base}/huespedes/", headers=self.headers)
             if resp.status_code == 200:
                 for h in resp.json():
+                    nombre = (h.get("nombre_completo") or "").lower()
+                    doc = (h.get("documento_identidad") or "").lower()
+                    if filtro and filtro not in nombre and filtro not in doc:
+                        continue
+
                     fila = ctk.CTkFrame(self.frame_lista_huespedes)
                     fila.pack(fill="x", pady=2, padx=2)
 
@@ -741,7 +825,6 @@ class PanelPrincipal(ctk.CTk):
                 "fecha_salida": self.entry_r_f_salida.get(),
                 "estado_reserva": "Confirmada",
                 "estado_folio": "Abierto",
-                "id_usuario": 2,
                 "id_huesped": int(self.entry_r_huesped_id.get()),
                 "id_habitacion": int(self.entry_r_hab_id.get())
             }
@@ -758,6 +841,29 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("Error", f"Fallo al crear reserva: {respuesta.text}")
         except Exception as e:
             messagebox.showerror("Error", f"Verifica que los IDs y fechas sean correctos: {str(e)}")
+
+    def ejecutar_cancelar_reserva(self):
+        try:
+            reserva_id = self.entry_checkin_id.get().strip()
+            if not reserva_id:
+                messagebox.showwarning("Advertencia", "Por favor ingresa o selecciona un ID de reserva.")
+                return
+            confirmar = messagebox.askyesno(
+                "Confirmar Cancelación",
+                f"¿Deseas cancelar la Reserva #{reserva_id} y liberar las fechas en el inventario?"
+            )
+            if not confirmar:
+                return
+            respuesta = requests.patch(f"{self.url_base}/reservas/{reserva_id}/cancelar", headers=self.headers)
+            if respuesta.status_code == 200:
+                data = respuesta.json()
+                messagebox.showinfo("Reserva Cancelada", data.get("mensaje", "Reserva cancelada con éxito."))
+                self.cargar_reservas()
+            else:
+                detalle = respuesta.json().get("detail", respuesta.text)
+                messagebox.showerror("No se pudo cancelar", detalle)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
     def ejecutar_checkin(self):
         try:

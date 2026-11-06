@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from app.db.database import get_db
+from app.api.dependencias import get_db, get_usuario_actual
 from app.models.habitaciones import EstadoHabitacion
 from app.models.finanzas import Cargo
 from app.schemas.reservas_folios import ReservaCrear, ReservaRespuesta
@@ -10,11 +10,20 @@ from app.crud import crud_reservas_folios, crud_habitaciones
 router = APIRouter()
 
 @router.get("/", response_model=List[ReservaRespuesta], summary="Listar reservas y folios")
-def listar_reservas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def listar_reservas(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
     return crud_reservas_folios.obtener_reservas(db, skip=skip, limit=limit)
 
 @router.get("/{reserva_id}", summary="Obtener detalle de una reserva y su Cuenta Folio")
-def obtener_detalle_reserva(reserva_id: int, db: Session = Depends(get_db)):
+def obtener_detalle_reserva(
+    reserva_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
         raise HTTPException(status_code=404, detail="Reserva no encontrada.")
@@ -46,9 +55,15 @@ def obtener_detalle_reserva(reserva_id: int, db: Session = Depends(get_db)):
     }
 
 @router.post("/", response_model=ReservaRespuesta, status_code=status.HTTP_201_CREATED, summary="Crear una reserva")
-def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
+def crear_reserva(
+    reserva: ReservaCrear,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
     
     # Lógica de negocio (F1SP3)
+    # Asignar automáticamente el empleado autenticado (auditoría de sesión activa)
+    reserva.id_usuario = usuario_actual.id_usuario
     
     # Validación de coherencia cronológica
     if reserva.fecha_salida <= reserva.fecha_entrada:
@@ -88,7 +103,11 @@ def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
 
 # F1SP4 - Programar el Check-in
 @router.post("/{reserva_id}/checkin", summary="Realizar Check-in y generar Cuenta Folio (F1SP4)")
-def realizar_checkin(reserva_id: int, db: Session = Depends(get_db)):
+def realizar_checkin(
+    reserva_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
     
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
@@ -140,7 +159,11 @@ def realizar_checkin(reserva_id: int, db: Session = Depends(get_db)):
 
 # RF-RES-005 - Programar el Check-out
 @router.post("/{reserva_id}/checkout", summary="Realizar Check-out validando saldo cero (RF-RES-005)")
-def realizar_checkout(reserva_id: int, db: Session = Depends(get_db)):
+def realizar_checkout(
+    reserva_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
         raise HTTPException(status_code=404, detail="Reserva no encontrada.")
@@ -171,5 +194,35 @@ def realizar_checkout(reserva_id: int, db: Session = Depends(get_db)):
         "mensaje": "Check-out realizado con éxito. Habitación marcada como Sucia y Folio cerrado.",
         "reserva_id": reserva_id,
         "nuevo_estado_reserva": "Finalizada",
+        "nuevo_estado_folio": "Cerrado",
+    }
+
+
+# RF-RES-002 / RF-RES-003 - Cancelación de Reserva antes del Check-in
+@router.patch("/{reserva_id}/cancelar", summary="Cancelar una reserva antes del Check-in (RF-RES-002)")
+def cancelar_reserva(
+    reserva_id: int,
+    db: Session = Depends(get_db),
+    usuario_actual=Depends(get_usuario_actual),
+):
+    reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada.")
+
+    if reserva.estado_reserva not in ["Pendiente", "Confirmada"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo se pueden cancelar reservas en estado 'Pendiente' o 'Confirmada' (estado actual: '{reserva.estado_reserva}')."
+        )
+
+    reserva.estado_reserva = "Cancelada"
+    reserva.estado_folio = "Cerrado"
+    db.commit()
+    db.refresh(reserva)
+
+    return {
+        "mensaje": f"Reserva #{reserva_id} cancelada con éxito. Las fechas han quedado liberadas en el inventario.",
+        "reserva_id": reserva_id,
+        "nuevo_estado_reserva": "Cancelada",
         "nuevo_estado_folio": "Cerrado",
     }

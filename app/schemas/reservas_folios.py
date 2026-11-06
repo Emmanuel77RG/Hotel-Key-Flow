@@ -7,7 +7,7 @@ class ReservaFolioBase(BaseModel):
     fecha_salida: date
     estado_reserva: str
     estado_folio: str
-    id_usuario: int
+    id_usuario: Optional[int] = None
     id_huesped: int
 
 class ReservaCrear(ReservaFolioBase):
