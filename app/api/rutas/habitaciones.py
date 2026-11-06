@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.schemas import habitaciones as schemas
 from app.crud import crud_habitaciones
-from app.api.dependencias import get_db, get_usuario_actual
+from app.api.dependencias import get_db, get_usuario_actual, exigir_rol_admin
 
 router = APIRouter()
 
@@ -11,7 +11,7 @@ router = APIRouter()
 def crear_habitacion(
     habitacion: schemas.HabitacionCrear, 
     db: Session = Depends(get_db),
-    usuario_actual = Depends(get_usuario_actual) # ¡Candado activado!
+    usuario_actual = Depends(exigir_rol_admin) # RF-HAB-001: Solo Administrador registra habitaciones
 ):
     db_habitacion = crud_habitaciones.obtener_habitacion_por_numero(db, numero=habitacion.numero_habitacion)
     if db_habitacion:
@@ -37,3 +37,21 @@ def cambiar_estado_limpieza(
     if not habitacion_actualizada:
         raise HTTPException(status_code=404, detail="Habitación no encontrada")
     return habitacion_actualizada
+
+@router.put("/{id_habitacion}", response_model=schemas.HabitacionRespuesta)
+def modificar_habitacion(
+    id_habitacion: int,
+    datos: schemas.HabitacionActualizar,
+    db: Session = Depends(get_db),
+    usuario_actual = Depends(exigir_rol_admin)
+):
+    habitacion_existente = crud_habitaciones.obtener_habitacion(db, id_habitacion)
+    if not habitacion_existente:
+        raise HTTPException(status_code=404, detail="Habitación no encontrada")
+
+    if datos.numero_habitacion and datos.numero_habitacion != habitacion_existente.numero_habitacion:
+        ocupada = crud_habitaciones.obtener_habitacion_por_numero(db, numero=datos.numero_habitacion)
+        if ocupada:
+            raise HTTPException(status_code=400, detail="El número de habitación ya existe")
+
+    return crud_habitaciones.actualizar_habitacion(db, id_habitacion=id_habitacion, datos=datos)

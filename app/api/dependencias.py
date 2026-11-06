@@ -39,5 +39,21 @@ def get_usuario_actual(
     usuario = obtener_usuario_por_email(db, email=email)
     if usuario is None:
         raise credenciales_exception
+    if not usuario.estado_activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta del usuario está desactivada",
+        )
     return usuario
+
+
+# Dependencia RBAC: Exige que el usuario autenticado tenga rol de Administrador (id_rol == 1)
+def exigir_rol_admin(usuario_actual=Depends(get_usuario_actual)):
+    if usuario_actual.id_rol != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: se requieren permisos de Administrador",
+        )
+    return usuario_actual
+
 

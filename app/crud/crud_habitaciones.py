@@ -27,3 +27,21 @@ def actualizar_estado_habitacion(db: Session, id_habitacion: int, estado_update:
 def obtener_habitacion(db: Session, habitacion_id: int):
     from app.models.habitaciones import Habitacion 
     return db.query(Habitacion).filter(Habitacion.id_habitacion == habitacion_id).first()
+
+def actualizar_habitacion(db: Session, id_habitacion: int, datos: schemas.HabitacionActualizar):
+    habitacion_db = obtener_habitacion(db, id_habitacion)
+    if not habitacion_db:
+        return None
+    if datos.numero_habitacion is not None:
+        habitacion_db.numero_habitacion = datos.numero_habitacion
+    if datos.tipo is not None:
+        habitacion_db.tipo = datos.tipo
+    if datos.capacidad is not None:
+        habitacion_db.capacidad = datos.capacidad
+    if datos.precio_base is not None:
+        habitacion_db.precio_base = datos.precio_base
+    if datos.estado is not None:
+        habitacion_db.estado = datos.estado
+    db.commit()
+    db.refresh(habitacion_db)
+    return habitacion_db
