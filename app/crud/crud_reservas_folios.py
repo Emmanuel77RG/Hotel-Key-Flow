@@ -1,9 +1,37 @@
+from datetime import date
 from sqlalchemy.orm import Session
 from app.models.reservas_folios import ReservaFolio
 from app.schemas.reservas_folios import ReservaCrear
 from app.models.habitaciones import Habitacion
+from app.models.finanzas import Cargo, Pago
 
 # Creación del CRUD - F1SP3
+
+def verificar_disponibilidad_fechas(
+    db: Session,
+    id_habitacion: int,
+    fecha_entrada: date,
+    fecha_salida: date,
+    excluir_reserva_id: int | None = None
+) -> bool:
+    """
+    RF-RES-003: Verifica que la habitación no tenga reservas activas o confirmadas
+    cuyas fechas se traslapen con el rango [fecha_entrada, fecha_salida).
+    """
+    query = (
+        db.query(ReservaFolio)
+        .join(ReservaFolio.habitaciones)
+        .filter(
+            Habitacion.id_habitacion == id_habitacion,
+            ReservaFolio.estado_reserva.in_(["Pendiente", "Confirmada", "Activa"]),
+            ReservaFolio.fecha_entrada < fecha_salida,
+            ReservaFolio.fecha_salida > fecha_entrada,
+        )
+    )
+    if excluir_reserva_id is not None:
+        query = query.filter(ReservaFolio.id_reserva != excluir_reserva_id)
+    reserva_en_conflicto = query.first()
+    return reserva_en_conflicto is None
 
 def crear_reserva(db: Session, reserva: ReservaCrear):
     db_reserva = ReservaFolio(
@@ -31,7 +59,7 @@ def obtener_reserva(db: Session, reserva_id: int):
 
 def obtener_reservas(db: Session, skip: int = 0, limit: int = 100):
     from app.models.reservas_folios import ReservaFolio
-    return db.query(ReservaFolio).offset(skip).limit(limit).all()
+    return db.query(ReservaFolio).order_by(ReservaFolio.id_reserva.desc()).offset(skip).limit(limit).all()
 
 def actualizar_estado_reserva(db: Session, reserva_id: int, nuevo_estado: str):
     reserva = db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
@@ -41,7 +69,7 @@ def actualizar_estado_reserva(db: Session, reserva_id: int, nuevo_estado: str):
         db.refresh(reserva)
     return reserva
 
-# F1SP4 - Programar el Check-in
+# F1SP4 - Programar el Check-in y Check-out
 
 def abrir_cuenta_folio(db: Session, reserva_id: int):
     reserva = db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
@@ -50,3 +78,25 @@ def abrir_cuenta_folio(db: Session, reserva_id: int):
         db.commit()
         db.refresh(reserva)
     return reserva
+
+def cerrar_cuenta_folio(db: Session, reserva_id: int):
+    reserva = db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
+    if reserva:
+        reserva.estado_folio = "Cerrado"
+        db.commit()
+        db.refresh(reserva)
+    return reserva
+
+def calcular_saldo_folio(db: Session, reserva_id: int) -> dict:
+    cargos = db.query(Cargo).filter(Cargo.id_reserva == reserva_id).all()
+    pagos = db.query(Pago).filter(Pago.id_reserva == reserva_id).all()
+    total_cargos = round(sum(float(c.monto) for c in cargos), 2)
+    total_pagos = round(sum(float(p.monto) for p in pagos), 2)
+    saldo_pendiente = round(total_cargos - total_pagos, 2)
+    return {
+        "total_cargos": total_cargos,
+        "total_pagos": total_pagos,
+        "saldo_pendiente": saldo_pendiente,
+        "cargos": cargos,
+        "pagos": pagos,
+    }

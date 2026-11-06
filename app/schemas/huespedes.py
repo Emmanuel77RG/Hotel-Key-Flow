@@ -10,6 +10,12 @@ class HuespedBase(BaseModel):
 class HuespedCrear(HuespedBase):
     pass
 
+class HuespedActualizar(BaseModel):
+    documento_identidad: Optional[str] = None
+    nombre_completo: Optional[str] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+
 class HuespedRespuesta(HuespedBase):
     id_huesped: int
 

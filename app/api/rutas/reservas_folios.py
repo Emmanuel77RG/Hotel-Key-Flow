@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
 from app.models.habitaciones import EstadoHabitacion
+from app.models.finanzas import Cargo
 from app.schemas.reservas_folios import ReservaCrear, ReservaRespuesta
 from app.crud import crud_reservas_folios, crud_habitaciones
 
@@ -12,7 +13,39 @@ router = APIRouter()
 def listar_reservas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud_reservas_folios.obtener_reservas(db, skip=skip, limit=limit)
 
-@router.post("/", response_model=ReservaRespuesta, summary="Crear una reserva")
+@router.get("/{reserva_id}", summary="Obtener detalle de una reserva y su Cuenta Folio")
+def obtener_detalle_reserva(reserva_id: int, db: Session = Depends(get_db)):
+    reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada.")
+
+    resumen_folio = crud_reservas_folios.calcular_saldo_folio(db, reserva_id=reserva_id)
+    habitaciones_info = [
+        {
+            "id_habitacion": h.id_habitacion,
+            "numero_habitacion": h.numero_habitacion,
+            "tipo": h.tipo,
+            "precio_base": float(h.precio_base),
+            "estado": h.estado.value if hasattr(h.estado, "value") else str(h.estado),
+        }
+        for h in reserva.habitaciones
+    ]
+
+    return {
+        "id_reserva": reserva.id_reserva,
+        "fecha_entrada": reserva.fecha_entrada,
+        "fecha_salida": reserva.fecha_salida,
+        "estado_reserva": reserva.estado_reserva,
+        "estado_folio": reserva.estado_folio,
+        "id_usuario": reserva.id_usuario,
+        "id_huesped": reserva.id_huesped,
+        "habitaciones": habitaciones_info,
+        "total_cargos": resumen_folio["total_cargos"],
+        "total_pagos": resumen_folio["total_pagos"],
+        "saldo_pendiente": resumen_folio["saldo_pendiente"],
+    }
+
+@router.post("/", response_model=ReservaRespuesta, status_code=status.HTTP_201_CREATED, summary="Crear una reserva")
 def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
     
     # Lógica de negocio (F1SP3)
@@ -24,15 +57,28 @@ def crear_reserva(reserva: ReservaCrear, db: Session = Depends(get_db)):
             detail="Error de lógica: La fecha de salida debe ser posterior a la fecha de entrada."
         )
 
-    # Validación de disponibilidad de la habitación
+    # Validación de existencia y estado físico de la habitación
     habitacion = crud_habitaciones.obtener_habitacion(db, habitacion_id=reserva.id_habitacion)
     if not habitacion:
         raise HTTPException(status_code=404, detail="La habitación solicitada no existe.")
     
-    if habitacion.estado != EstadoHabitacion.LIMPIA:  # o comparando con su valor en texto según tu lógica
+    if habitacion.estado == EstadoHabitacion.MANTENIMIENTO:
         raise HTTPException(
             status_code=400,
-            detail=f"La habitación {habitacion.numero_habitacion} actualmente se encuentra {habitacion.estado}."
+            detail=f"La habitación {habitacion.numero_habitacion} se encuentra en Mantenimiento."
+        )
+
+    # RF-RES-003: Motor de Disponibilidad - Prevención de Overbooking por cruce de fechas
+    disponible = crud_reservas_folios.verificar_disponibilidad_fechas(
+        db,
+        id_habitacion=reserva.id_habitacion,
+        fecha_entrada=reserva.fecha_entrada,
+        fecha_salida=reserva.fecha_salida,
+    )
+    if not disponible:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Inventario no disponible para las fechas seleccionadas"
         )
 
     # OPERACIÓN CRUD
@@ -53,14 +99,77 @@ def realizar_checkin(reserva_id: int, db: Session = Depends(get_db)):
             status_code=400, 
             detail=f"No se puede hacer check-in. La reserva está '{reserva.estado_reserva}'."
         )
-    reserva_actualizada = crud_reservas_folios.actualizar_estado_reserva(
-        db, reserva_id=reserva_id, nuevo_estado="Activa"
-    )
-    crud_reservas_folios.abrir_cuenta_folio(db=db, reserva_id=reserva_id)
+
+    # RF-HAB-004: Bloqueo operativo si la habitación no está estrictamente "Limpia"
+    for hab in reserva.habitaciones:
+        if hab.estado != EstadoHabitacion.LIMPIA:
+            estado_txt = hab.estado.value if hasattr(hab.estado, "value") else str(hab.estado)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Bloqueo operativo (RF-HAB-004): La habitación {hab.numero_habitacion} no está Limpia (estado actual: {estado_txt})."
+            )
+
+    # Calculamos noches de estadía y generamos el Cargo Automático de Hospedaje (RF-FAC-001 y RF-FAC-002)
+    noches = max(1, (reserva.fecha_salida - reserva.fecha_entrada).days)
+    monto_hospedaje_total = 0.0
+    for hab in reserva.habitaciones:
+        hab.estado = EstadoHabitacion.OCUPADA
+        subtotal_hab = round(float(hab.precio_base) * noches, 2)
+        monto_hospedaje_total += subtotal_hab
+        cargo_hospedaje = Cargo(
+            monto=subtotal_hab,
+            descripcion=f"Hospedaje Hab. {hab.numero_habitacion} ({noches} noche(s) x ${float(hab.precio_base):.2f})",
+            id_reserva=reserva_id,
+        )
+        db.add(cargo_hospedaje)
+
+    reserva.estado_reserva = "Activa"
+    reserva.estado_folio = "Abierto"
+    db.commit()
+    db.refresh(reserva)
 
     return {
         "mensaje": "Check-in realizado y Folio abierto con éxito.",
         "reserva_id": reserva_id,
         "nuevo_estado_reserva": "Activa",
-        "nuevo_estado_folio": "Abierto"
+        "nuevo_estado_folio": "Abierto",
+        "noches": noches,
+        "cargo_hospedaje_generado": round(monto_hospedaje_total, 2),
+    }
+
+
+# RF-RES-005 - Programar el Check-out
+@router.post("/{reserva_id}/checkout", summary="Realizar Check-out validando saldo cero (RF-RES-005)")
+def realizar_checkout(reserva_id: int, db: Session = Depends(get_db)):
+    reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
+    if not reserva:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada.")
+
+    if reserva.estado_reserva != "Activa":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo se puede realizar Check-out de una reserva 'Activa' (estado actual: '{reserva.estado_reserva}')."
+        )
+
+    resumen_folio = crud_reservas_folios.calcular_saldo_folio(db, reserva_id=reserva_id)
+    if resumen_folio["saldo_pendiente"] > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede procesar el Check-out: la Cuenta Folio tiene un saldo pendiente de ${resumen_folio['saldo_pendiente']:.2f}."
+        )
+
+    # Liberar habitación(es) pasándolas a estado "Sucia" y cerrar Folio/Reserva
+    for hab in reserva.habitaciones:
+        hab.estado = EstadoHabitacion.SUCIA
+
+    reserva.estado_reserva = "Finalizada"
+    reserva.estado_folio = "Cerrado"
+    db.commit()
+    db.refresh(reserva)
+
+    return {
+        "mensaje": "Check-out realizado con éxito. Habitación marcada como Sucia y Folio cerrado.",
+        "reserva_id": reserva_id,
+        "nuevo_estado_reserva": "Finalizada",
+        "nuevo_estado_folio": "Cerrado",
     }

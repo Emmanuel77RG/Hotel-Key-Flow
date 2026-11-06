@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
-from app.schemas.huespedes import HuespedCrear, HuespedRespuesta
+from app.schemas.huespedes import HuespedCrear, HuespedActualizar, HuespedRespuesta
 from app.crud import crud_huespedes
 
 router = APIRouter()
@@ -14,3 +14,10 @@ def listar_huespedes(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 @router.post("/", response_model=HuespedRespuesta, summary="Registrar un nuevo huésped")
 def crear_huesped(huesped: HuespedCrear, db: Session = Depends(get_db)):
     return crud_huespedes.crear_huesped(db=db, huesped=huesped)
+
+@router.put("/{id_huesped}", response_model=HuespedRespuesta, summary="Modificar datos de un huésped")
+def modificar_huesped(id_huesped: int, datos: HuespedActualizar, db: Session = Depends(get_db)):
+    actualizado = crud_huespedes.actualizar_huesped(db, id_huesped=id_huesped, datos=datos)
+    if not actualizado:
+        raise HTTPException(status_code=404, detail="Huésped no encontrado")
+    return actualizado

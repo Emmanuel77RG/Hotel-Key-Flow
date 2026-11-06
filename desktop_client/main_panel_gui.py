@@ -485,40 +485,82 @@ class PanelPrincipal(ctk.CTk):
     def construir_pestana_recepcion(self):
         tab_rec = self.tabview.tab("Recepción y Reservas")
         
-        # Frame izquierdo: Registro de Huéspedes
+        # Frame izquierdo: Registro y Directorio de Huéspedes (RF-RES-001)
         frame_huesped = ctk.CTkFrame(tab_rec)
-        frame_huesped.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        frame_huesped.pack(side="left", fill="both", expand=True, padx=(10, 5), pady=10)
         
-        ctk.CTkLabel(frame_huesped, text="Registro de Huésped", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        self.entry_h_nombre = ctk.CTkEntry(frame_huesped, placeholder_text="Nombre Completo")
-        self.entry_h_nombre.pack(pady=5)
-        self.entry_h_doc = ctk.CTkEntry(frame_huesped, placeholder_text="Documento de Identidad")
-        self.entry_h_doc.pack(pady=5)
-        self.entry_h_email = ctk.CTkEntry(frame_huesped, placeholder_text="Correo Electrónico")
-        self.entry_h_email.pack(pady=5)
-        self.entry_h_tel = ctk.CTkEntry(frame_huesped, placeholder_text="Teléfono")
-        self.entry_h_tel.pack(pady=5)
-        ctk.CTkButton(frame_huesped, text="Registrar Huésped", command=self.crear_huesped).pack(pady=20)
+        ctk.CTkLabel(frame_huesped, text="Registro de Huésped", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 6))
+        self.entry_h_nombre = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Nombre Completo")
+        self.entry_h_nombre.pack(pady=3)
+        self.entry_h_doc = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Documento de Identidad")
+        self.entry_h_doc.pack(pady=3)
+        self.entry_h_email = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Correo Electrónico")
+        self.entry_h_email.pack(pady=3)
+        self.entry_h_tel = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Teléfono")
+        self.entry_h_tel.pack(pady=3)
+        ctk.CTkButton(frame_huesped, text="Registrar Huésped", width=200, command=self.crear_huesped).pack(pady=8)
+
+        frame_hdr_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
+        frame_hdr_h.pack(fill="x", padx=10, pady=(6, 2))
+        ctk.CTkLabel(frame_hdr_h, text="Directorio de Huéspedes", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left")
+        ctk.CTkButton(frame_hdr_h, text="Refrescar", width=85, height=24, command=self.cargar_huespedes).pack(side="right")
+
+        self.frame_lista_huespedes = ctk.CTkScrollableFrame(frame_huesped, height=180)
+        self.frame_lista_huespedes.pack(fill="both", expand=True, padx=8, pady=5)
         
-        # Frame derecho: Creación de Reservas y Check-in
+        # Frame derecho: Creación de Reservas, Check-in, Check-out y Listado (RF-RES-002 a RF-RES-005)
         frame_res = ctk.CTkFrame(tab_rec)
-        frame_res.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        frame_res.pack(side="right", fill="both", expand=True, padx=(5, 10), pady=10)
         
-        ctk.CTkLabel(frame_res, text="Gestión de Reservas", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
-        self.entry_r_huesped_id = ctk.CTkEntry(frame_res, placeholder_text="ID Huésped")
-        self.entry_r_huesped_id.pack(pady=5)
-        self.entry_r_hab_id = ctk.CTkEntry(frame_res, placeholder_text="ID Habitación")
-        self.entry_r_hab_id.pack(pady=5)
-        self.entry_r_f_entrada = ctk.CTkEntry(frame_res, placeholder_text="Fecha Entrada (AAAA-MM-DD)")
-        self.entry_r_f_entrada.pack(pady=5)
-        self.entry_r_f_salida = ctk.CTkEntry(frame_res, placeholder_text="Fecha Salida (AAAA-MM-DD)")
-        self.entry_r_f_salida.pack(pady=5)
-        ctk.CTkButton(frame_res, text="Crear Reserva", command=self.crear_reserva).pack(pady=10)
+        ctk.CTkLabel(frame_res, text="Gestión de Reservas", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 6))
+
+        frame_inputs_res = ctk.CTkFrame(frame_res, fg_color="transparent")
+        frame_inputs_res.pack(pady=2)
+
+        self.entry_r_huesped_id = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="ID Huésped")
+        self.entry_r_huesped_id.grid(row=0, column=0, padx=4, pady=3)
+        self.entry_r_hab_id = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="ID Habitación")
+        self.entry_r_hab_id.grid(row=0, column=1, padx=4, pady=3)
+        self.entry_r_f_entrada = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="Entrada (AAAA-MM-DD)")
+        self.entry_r_f_entrada.grid(row=1, column=0, padx=4, pady=3)
+        self.entry_r_f_salida = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="Salida (AAAA-MM-DD)")
+        self.entry_r_f_salida.grid(row=1, column=1, padx=4, pady=3)
+
+        ctk.CTkButton(frame_res, text="Crear Reserva", width=200, command=self.crear_reserva).pack(pady=6)
         
-        ctk.CTkLabel(frame_res, text="Ejecutar Check-in / Folio", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(10, 5))
-        self.entry_checkin_id = ctk.CTkEntry(frame_res, placeholder_text="ID de Reserva")
-        self.entry_checkin_id.pack(pady=5)
-        ctk.CTkButton(frame_res, text="Hacer Check-in & Abrir Folio", fg_color="#2E7D32", hover_color="#1b5e20", command=self.ejecutar_checkin).pack(pady=10)
+        ctk.CTkLabel(frame_res, text="Operación de Recepción (Check-in / Check-out)", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(6, 3))
+        self.entry_checkin_id = ctk.CTkEntry(frame_res, width=180, placeholder_text="ID de Reserva")
+        self.entry_checkin_id.pack(pady=3)
+
+        frame_btns_op = ctk.CTkFrame(frame_res, fg_color="transparent")
+        frame_btns_op.pack(pady=4)
+        ctk.CTkButton(
+            frame_btns_op,
+            text="Check-in & Abrir Folio",
+            width=155,
+            fg_color="#2E7D32",
+            hover_color="#1b5e20",
+            command=self.ejecutar_checkin
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            frame_btns_op,
+            text="Ejecutar Check-out",
+            width=155,
+            fg_color="#E65100",
+            hover_color="#BF360C",
+            command=self.ejecutar_checkout
+        ).pack(side="left", padx=5)
+
+        frame_hdr_r = ctk.CTkFrame(frame_res, fg_color="transparent")
+        frame_hdr_r.pack(fill="x", padx=10, pady=(6, 2))
+        ctk.CTkLabel(frame_hdr_r, text="Reservas Registradas", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left")
+        ctk.CTkButton(frame_hdr_r, text="Refrescar", width=85, height=24, command=self.cargar_reservas).pack(side="right")
+
+        self.frame_lista_reservas = ctk.CTkScrollableFrame(frame_res, height=150)
+        self.frame_lista_reservas.pack(fill="both", expand=True, padx=8, pady=5)
+
+        self.cargar_huespedes()
+        self.cargar_reservas()
 
     def construir_pestana_folios(self):
         tab_fol = self.tabview.tab("Facturación y Folios")
@@ -545,11 +587,152 @@ class PanelPrincipal(ctk.CTk):
             }
             respuesta = requests.post(f"{self.url_base}/huespedes/", json=datos, headers=self.headers)
             if respuesta.status_code in [200, 201]:
-                messagebox.showinfo("Éxito", "Huésped registrado correctamente en el sistema.")
+                h_json = respuesta.json()
+                messagebox.showinfo("Éxito", f"Huésped registrado correctamente (ID: #{h_json.get('id_huesped')}).")
+                self.cargar_huespedes()
             else:
                 messagebox.showerror("Error", f"No se pudo registrar: {respuesta.text}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def cargar_huespedes(self):
+        if not hasattr(self, "frame_lista_huespedes"):
+            return
+        for widget in self.frame_lista_huespedes.winfo_children():
+            widget.destroy()
+
+        try:
+            resp = requests.get(f"{self.url_base}/huespedes/", headers=self.headers)
+            if resp.status_code == 200:
+                for h in resp.json():
+                    fila = ctk.CTkFrame(self.frame_lista_huespedes)
+                    fila.pack(fill="x", pady=2, padx=2)
+
+                    ctk.CTkLabel(
+                        fila,
+                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({h['documento_identidad']})",
+                        font=ctk.CTkFont(size=12)
+                    ).pack(side="left", padx=6, pady=4)
+
+                    ctk.CTkButton(
+                        fila,
+                        text="Usar ID",
+                        width=58,
+                        height=24,
+                        fg_color="#2E7D32",
+                        command=lambda hid=h["id_huesped"]: self.seleccionar_huesped_id(hid)
+                    ).pack(side="right", padx=3, pady=3)
+
+                    ctk.CTkButton(
+                        fila,
+                        text="Editar",
+                        width=55,
+                        height=24,
+                        command=lambda hdata=h: self.abrir_modal_editar_huesped(hdata)
+                    ).pack(side="right", padx=3, pady=3)
+        except requests.exceptions.ConnectionError:
+            pass
+
+    def seleccionar_huesped_id(self, id_huesped):
+        self.entry_r_huesped_id.delete(0, "end")
+        self.entry_r_huesped_id.insert(0, str(id_huesped))
+
+    def abrir_modal_editar_huesped(self, huesped):
+        modal = ctk.CTkToplevel(self)
+        modal.title(f"Editar Huésped #{huesped['id_huesped']}")
+        modal.geometry("350x340")
+        modal.grab_set()
+
+        ctk.CTkLabel(modal, text=f"Editar Huésped #{huesped['id_huesped']}", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=12)
+
+        e_nombre = ctk.CTkEntry(modal, width=250, placeholder_text="Nombre Completo")
+        e_nombre.insert(0, huesped.get("nombre_completo", "") or "")
+        e_nombre.pack(pady=5)
+
+        e_doc = ctk.CTkEntry(modal, width=250, placeholder_text="Documento de Identidad")
+        e_doc.insert(0, huesped.get("documento_identidad", "") or "")
+        e_doc.pack(pady=5)
+
+        e_email = ctk.CTkEntry(modal, width=250, placeholder_text="Correo Electrónico")
+        e_email.insert(0, huesped.get("email", "") or "")
+        e_email.pack(pady=5)
+
+        e_tel = ctk.CTkEntry(modal, width=250, placeholder_text="Teléfono")
+        e_tel.insert(0, huesped.get("telefono", "") or "")
+        e_tel.pack(pady=5)
+
+        def guardar():
+            datos = {
+                "nombre_completo": e_nombre.get().strip(),
+                "documento_identidad": e_doc.get().strip(),
+                "email": e_email.get().strip(),
+                "telefono": e_tel.get().strip(),
+            }
+            try:
+                r = requests.put(
+                    f"{self.url_base}/huespedes/{huesped['id_huesped']}",
+                    json=datos,
+                    headers=self.headers
+                )
+                if r.status_code == 200:
+                    messagebox.showinfo("Éxito", "Datos del huésped actualizados.")
+                    modal.destroy()
+                    self.cargar_huespedes()
+                else:
+                    messagebox.showerror("Error", f"No se pudo actualizar: {r.text}")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+
+        ctk.CTkButton(modal, text="Guardar Cambios", width=180, command=guardar).pack(pady=15)
+
+    def cargar_reservas(self):
+        if not hasattr(self, "frame_lista_reservas"):
+            return
+        for widget in self.frame_lista_reservas.winfo_children():
+            widget.destroy()
+
+        colores_res = {
+            "Confirmada": "#64B5F6",
+            "Activa": "#66BB6A",
+            "Finalizada": "#BDBDBD",
+            "Cancelada": "#EF5350",
+        }
+        try:
+            resp = requests.get(f"{self.url_base}/reservas/", headers=self.headers)
+            if resp.status_code == 200:
+                for r in resp.json():
+                    fila = ctk.CTkFrame(self.frame_lista_reservas)
+                    fila.pack(fill="x", pady=2, padx=2)
+
+                    est = r.get("estado_reserva", "")
+                    color_txt = colores_res.get(est, "white")
+                    texto = (
+                        f"Reserva #{r['id_reserva']} | Huésped #{r['id_huesped']} | "
+                        f"{r['fecha_entrada']} -> {r['fecha_salida']} [{est}]"
+                    )
+                    ctk.CTkLabel(
+                        fila,
+                        text=texto,
+                        text_color=color_txt,
+                        font=ctk.CTkFont(size=11, weight="bold")
+                    ).pack(side="left", padx=6, pady=4)
+
+                    ctk.CTkButton(
+                        fila,
+                        text="Seleccionar",
+                        width=75,
+                        height=24,
+                        command=lambda rid=r["id_reserva"]: self.seleccionar_reserva_id(rid)
+                    ).pack(side="right", padx=4, pady=3)
+        except requests.exceptions.ConnectionError:
+            pass
+
+    def seleccionar_reserva_id(self, id_reserva):
+        self.entry_checkin_id.delete(0, "end")
+        self.entry_checkin_id.insert(0, str(id_reserva))
+        if hasattr(self, "entry_folio_reserva_id"):
+            self.entry_folio_reserva_id.delete(0, "end")
+            self.entry_folio_reserva_id.insert(0, str(id_reserva))
 
     def crear_reserva(self):
         try:
@@ -558,7 +741,7 @@ class PanelPrincipal(ctk.CTk):
                 "fecha_salida": self.entry_r_f_salida.get(),
                 "estado_reserva": "Confirmada",
                 "estado_folio": "Abierto",
-                "id_usuario": 2,  # <--- Cambia el 1 por el ID 2 o 3 que acabamos de ver en la base de datos
+                "id_usuario": 2,
                 "id_huesped": int(self.entry_r_huesped_id.get()),
                 "id_habitacion": int(self.entry_r_hab_id.get())
             }
@@ -566,6 +749,11 @@ class PanelPrincipal(ctk.CTk):
             if respuesta.status_code in [200, 201]:
                 res_json = respuesta.json()
                 messagebox.showinfo("Éxito", f"Reserva creada con éxito. ID Asignado: {res_json.get('id_reserva')}")
+                self.cargar_reservas()
+            elif respuesta.status_code == 409:
+                # Criterio de Aceptación BDD RF-RES-003 (Prevención de Overbooking)
+                detalle = respuesta.json().get("detail", "Inventario no disponible para las fechas seleccionadas")
+                messagebox.showerror("Sin Disponibilidad (RF-RES-003)", detalle)
             else:
                 messagebox.showerror("Error", f"Fallo al crear reserva: {respuesta.text}")
         except Exception as e:
@@ -580,9 +768,41 @@ class PanelPrincipal(ctk.CTk):
             respuesta = requests.post(f"{self.url_base}/reservas/{reserva_id}/checkin", headers=self.headers)
             if respuesta.status_code == 200:
                 data = respuesta.json()
-                messagebox.showinfo("Éxito", f"¡Check-in realizado y Folio abierto!\nEstado Reserva: {data.get('nuevo_estado_reserva')}\nEstado Folio: {data.get('nuevo_estado_folio')}")
+                cargo_gen = data.get("cargo_hospedaje_generado", 0.0)
+                messagebox.showinfo(
+                    "Éxito",
+                    f"¡Check-in realizado y Folio abierto!\n"
+                    f"Estado Reserva: {data.get('nuevo_estado_reserva')}\n"
+                    f"Estado Folio: {data.get('nuevo_estado_folio')}\n"
+                    f"Cargo automático por hospedaje: ${cargo_gen:.2f}"
+                )
+                self.cargar_habitaciones()
+                self.cargar_reservas()
             else:
                 messagebox.showerror("Error", f"No se pudo completar el check-in: {respuesta.text}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def ejecutar_checkout(self):
+        try:
+            reserva_id = self.entry_checkin_id.get()
+            if not reserva_id:
+                messagebox.showwarning("Advertencia", "Por favor ingresa un ID de reserva.")
+                return
+            respuesta = requests.post(f"{self.url_base}/reservas/{reserva_id}/checkout", headers=self.headers)
+            if respuesta.status_code == 200:
+                data = respuesta.json()
+                messagebox.showinfo(
+                    "Check-out Exitoso",
+                    f"{data.get('mensaje')}\n"
+                    f"Estado Reserva: {data.get('nuevo_estado_reserva')}\n"
+                    f"Estado Folio: {data.get('nuevo_estado_folio')}"
+                )
+                self.cargar_habitaciones()
+                self.cargar_reservas()
+            else:
+                detalle = respuesta.json().get("detail", respuesta.text)
+                messagebox.showerror("No se puede realizar Check-out", detalle)
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -592,11 +812,15 @@ class PanelPrincipal(ctk.CTk):
             respuesta = requests.get(f"{self.url_base}/reservas/{reserva_id}", headers=self.headers)
             if respuesta.status_code == 200:
                 data = respuesta.json()
-                texto = (f"--- DETALLE DE CUENTA FOLIO ---\n"
-                         f"Reserva ID: {data.get('id_reserva')}\n"
-                         f"Estado de Reserva: {data.get('estado_reserva')}\n"
-                         f"Estado de Folio: {data.get('estado_folio')}\n"
-                         f"Entrada: {data.get('fecha_entrada')} | Salida: {data.get('fecha_salida')}")
+                texto = (
+                    f"--- DETALLE DE CUENTA FOLIO ---\n"
+                    f"Reserva ID: {data.get('id_reserva')} | Huésped ID: {data.get('id_huesped')}\n"
+                    f"Estado de Reserva: {data.get('estado_reserva')} | Estado de Folio: {data.get('estado_folio')}\n"
+                    f"Entrada: {data.get('fecha_entrada')} | Salida: {data.get('fecha_salida')}\n"
+                    f"Total Cargos: ${data.get('total_cargos', 0.0):.2f} | "
+                    f"Total Pagos: ${data.get('total_pagos', 0.0):.2f} | "
+                    f"Saldo Pendiente: ${data.get('saldo_pendiente', 0.0):.2f}"
+                )
                 self.label_resultado_folio.configure(text=texto, text_color="white")
             else:
                 messagebox.showerror("Error", "No se encontró información para esa reserva.")
