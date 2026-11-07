@@ -120,12 +120,25 @@ def timbrar_factura_pac(
         reserva.huesped.rfc = datos_factura.rfc_cliente
         db.commit()
 
+    nums_hab = ", ".join(h.numero_habitacion for h in reserva.habitaciones) if reserva.habitaciones else "S/N"
+
     return {
         "mensaje": "Factura timbrada exitosamente mediante PAC (Sandbox).",
         "uuid_fiscal": uuid_fiscal,
         "id_reserva": reserva.id_reserva,
         "rfc_receptor": datos_factura.rfc_cliente,
         "razon_social": datos_factura.razon_social or "PÚBLICO EN GENERAL",
+        "habitaciones": nums_hab,
+        "fecha_entrada": str(reserva.fecha_entrada),
+        "fecha_salida": str(reserva.fecha_salida),
+        "cargos": [
+            {"descripcion": c.descripcion, "monto": round(float(c.monto), 2)}
+            for c in resumen["cargos"]
+        ],
+        "pagos": [
+            {"metodo_pago": p.metodo_pago, "monto": round(float(p.monto), 2)}
+            for p in resumen["pagos"]
+        ],
         "subtotal": subtotal,
         "iva_16": iva,
         "total_facturado": total,
