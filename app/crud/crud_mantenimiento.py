@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.mantenimiento import TicketMantenimiento
 from app.schemas.mantenimiento import (
     TicketMantenimientoActualizar,
@@ -25,6 +25,10 @@ def _enriquecer_ticket(db_ticket: TicketMantenimiento):
 def obtener_tickets(db: Session, skip: int = 0, limit: int = 100):
     tickets = (
         db.query(TicketMantenimiento)
+        .options(
+            joinedload(TicketMantenimiento.habitacion),
+            joinedload(TicketMantenimiento.usuario_reporta),
+        )
         .order_by(TicketMantenimiento.id_ticket.desc())
         .offset(skip)
         .limit(limit)
@@ -35,6 +39,10 @@ def obtener_tickets(db: Session, skip: int = 0, limit: int = 100):
 def obtener_ticket_por_id(db: Session, id_ticket: int):
     ticket = (
         db.query(TicketMantenimiento)
+        .options(
+            joinedload(TicketMantenimiento.habitacion),
+            joinedload(TicketMantenimiento.usuario_reporta),
+        )
         .filter(TicketMantenimiento.id_ticket == id_ticket)
         .first()
     )

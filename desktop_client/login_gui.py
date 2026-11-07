@@ -12,6 +12,8 @@ ctk.set_default_color_theme("blue")
 class VentanaLogin(ctk.CTk):
     def __init__(self):
         super().__init__()
+        self.withdraw()
+        self.http = requests.Session()
         
         self.title("Hotel KeyFlow - Acceso")
         self.geometry("400x500")
@@ -33,16 +35,21 @@ class VentanaLogin(ctk.CTk):
         # Campo Correo
         self.entry_email = ctk.CTkEntry(self, placeholder_text="Correo electrónico", width=280, height=40)
         self.entry_email.pack(pady=10)
+        self.entry_email.bind("<Return>", lambda _e: self.procesar_login())
         
         # Campo Contraseña
         self.entry_password = ctk.CTkEntry(self, placeholder_text="Contraseña", show="*", width=280, height=40)
         self.entry_password.pack(pady=20)
+        self.entry_password.bind("<Return>", lambda _e: self.procesar_login())
         
         # Botón Iniciar Sesión
         self.btn_login = ctk.CTkButton(self, text="Iniciar Sesión", width=280, height=40, font=ctk.CTkFont(weight="bold"), command=self.procesar_login)
         self.btn_login.pack(pady=20)
+
+        self.update_idletasks()
+        self.deiconify()
         
-    def procesar_login(self):
+    def procesar_login(self, *_args):
         email = self.entry_email.get()
         password = self.entry_password.get()
         
@@ -59,8 +66,8 @@ class VentanaLogin(ctk.CTk):
         url_api = "http://127.0.0.1:8000/login"
         
         try:
-            # Enviamos la petición a nuestro Backend
-            respuesta = requests.post(url_api, data=datos_formulario)
+            # Enviamos la petición a nuestro Backend reutilizando sesión HTTP
+            respuesta = self.http.post(url_api, data=datos_formulario)
             
             if respuesta.status_code == 200:
                 # ¡Acceso concedido! Extraemos el token y el rol

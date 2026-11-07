@@ -22,12 +22,24 @@ from reportlab.platypus import (
 class PanelPrincipal(ctk.CTk):
     def __init__(self, token, id_rol):
         super().__init__()
+        self.withdraw()
         self.title("Hotel KeyFlow")
         
         self.token = token
         self.id_rol = id_rol
         self.headers = {"Authorization": f"Bearer {self.token}"}
         self.url_base = "http://127.0.0.1:8000"
+        self.http = requests.Session()
+        self.http.headers.update(self.headers)
+
+        # Cachés en memoria y temporizadores de debounce para evitar llamadas de red repetitivas
+        self.cache_habitaciones = []
+        self.cache_huespedes = []
+        self.cache_reservas = []
+        self.cache_tickets = []
+        self._after_busq_huesped = None
+        self._after_busq_ticket = None
+        self._pestanas_construidas = set()
         
         # --- DICCIONARIO DE COLORES PARA LA MÁQUINA DE ESTADOS ---
         self.COLORES_ESTADO = {
@@ -46,7 +58,7 @@ class PanelPrincipal(ctk.CTk):
         self.ruta_logo_light = os.path.join(ruta_assets, "logo_light.png")
         if os.path.exists(self.ruta_logo_dark):
             img_dark = Image.open(self.ruta_logo_dark)
-            img_light = Image.open(self.ruta_logo_light) if os.path.exists(self.ruta_logo_light) else img_dark
+            img_light = Image.open(ruta_light) if os.path.exists(self.ruta_logo_light) else img_dark
             self.logo_header_ctk = ctk.CTkImage(light_image=img_light, dark_image=img_dark, size=(168, 66))
             self.label_titulo = ctk.CTkLabel(self.header_frame, text="", image=self.logo_header_ctk)
         else:
@@ -66,28 +78,70 @@ class PanelPrincipal(ctk.CTk):
         )
         self.label_rol_actual.pack(side="right", padx=20)
         
-        self.tabview = ctk.CTkTabview(self, width=900, height=550)
+        self.tabview = ctk.CTkTabview(self, width=900, height=550, command=self._al_cambiar_pestana)
         self.tabview.pack(pady=10, padx=20, fill="both", expand=True)
         
-        # Pestaña de Usuarios (Protegida por Rol Administrador: RF-ADM-002 y RF-ADM-003)
+        # Registro de pestañas disponibles según Rol (Carga Perezosa / Lazy Loading)
         if self.id_rol == 1:
             self.tabview.add("Usuarios")
-            self.construir_pestana_admin()
-            
         self.tabview.add("Habitaciones")
         if self.id_rol in (1, 2):
             self.tabview.add("Recepción y Reservas")
-            self.construir_pestana_recepcion()
             self.tabview.add("Facturación y Folios")
-            self.construir_pestana_folios()
             self.tabview.add("Punto de Venta")
-            self.crear_placeholder(self.tabview.tab("Punto de Venta"), "Módulo de Punto de Venta (Restaurante y Room Service)\n\n(En desarrollo - Sprint 6)")
         self.tabview.add("Mantenimiento")
-        self.construir_pestana_mantenimiento()
         if self.id_rol in (1, 2):
             self.tabview.add("Reportes")
-            self.crear_placeholder(self.tabview.tab("Reportes"), "Módulo de Reportes Operativos y Corte de Caja\n\n(En desarrollo - Sprint 7)")
-        
+
+        # Construir únicamente la pestaña activa inicial para un arranque instantáneo
+        self._asegurar_pestana(self.tabview.get())
+        self.update_idletasks()
+        self.deiconify()
+
+    def _al_cambiar_pestana(self):
+        self._asegurar_pestana(self.tabview.get())
+
+    def _asegurar_pestana(self, nombre_pestana: str):
+        if not nombre_pestana or nombre_pestana in self._pestanas_construidas:
+            return
+        self._pestanas_construidas.add(nombre_pestana)
+        if nombre_pestana == "Usuarios":
+            self.construir_pestana_admin()
+        elif nombre_pestana == "Habitaciones":
+            self.construir_pestana_habitaciones()
+        elif nombre_pestana == "Recepción y Reservas":
+            self.construir_pestana_recepcion()
+        elif nombre_pestana == "Facturación y Folios":
+            self.construir_pestana_folios()
+        elif nombre_pestana == "Punto de Venta":
+            self.crear_placeholder(
+                self.tabview.tab("Punto de Venta"),
+                "Módulo de Punto de Venta (Restaurante y Room Service)\n\n(En desarrollo - Sprint 6)"
+            )
+        elif nombre_pestana == "Mantenimiento":
+            self.construir_pestana_mantenimiento()
+        elif nombre_pestana == "Reportes":
+            self.crear_placeholder(
+                self.tabview.tab("Reportes"),
+                "Módulo de Reportes Operativos y Corte de Caja\n\n(En desarrollo - Sprint 7)"
+            )
+
+    def _crear_modal(self, titulo: str, geometria: str, resizable: bool = False):
+        modal = ctk.CTkToplevel(self)
+        modal.withdraw()
+        modal.title(titulo)
+        modal.geometry(geometria)
+        modal.resizable(resizable, resizable)
+        modal.transient(self)
+        return modal
+
+    def _mostrar_modal(self, modal):
+        modal.update_idletasks()
+        modal.deiconify()
+        modal.grab_set()
+        modal.focus_force()
+
+    def construir_pestana_habitaciones(self):
         # --- MÓDULO DE HABITACIONES (BARRA SUPERIOR + GRID) ---
         tab_hab = self.tabview.tab("Habitaciones")
         self.frame_top_hab = ctk.CTkFrame(tab_hab, fg_color="transparent")
@@ -169,10 +223,7 @@ class PanelPrincipal(ctk.CTk):
         self.cargar_usuarios()
 
     def abrir_modal_nueva_habitacion(self):
-        modal = ctk.CTkToplevel(self)
-        modal.title("Alta de Nueva Habitación")
-        modal.geometry("360x350")
-        modal.grab_set()
+        modal = self._crear_modal("Alta de Nueva Habitación", "360x350")
 
         ctk.CTkLabel(modal, text="Registrar Habitación", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         self.entry_num_hab = ctk.CTkEntry(modal, width=250, placeholder_text="Número (Ej. 102)")
@@ -189,6 +240,7 @@ class PanelPrincipal(ctk.CTk):
                 modal.destroy()
 
         ctk.CTkButton(modal, text="Guardar Habitación", width=200, fg_color="#2E7D32", hover_color="#1b5e20", command=guardar).pack(pady=20)
+        self._mostrar_modal(modal)
 
     def crear_habitacion(self):
         try:
@@ -198,7 +250,7 @@ class PanelPrincipal(ctk.CTk):
                 "capacidad": int(self.entry_capacidad.get()),
                 "precio_base": float(self.entry_precio.get())
             }
-            respuesta = requests.post(f"{self.url_base}/habitaciones/", json=datos, headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/habitaciones/", json=datos)
             if respuesta.status_code == 201:
                 messagebox.showinfo("Éxito", "Habitación creada en la base de datos.")
                 self.cargar_habitaciones()
@@ -211,10 +263,7 @@ class PanelPrincipal(ctk.CTk):
             return False
 
     def abrir_modal_editar_habitacion(self, habitacion):
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"Editar Habitación {habitacion['numero_habitacion']}")
-        modal.geometry("360x360")
-        modal.grab_set()
+        modal = self._crear_modal(f"Editar Habitación {habitacion['numero_habitacion']}", "360x360")
 
         ctk.CTkLabel(
             modal,
@@ -246,10 +295,9 @@ class PanelPrincipal(ctk.CTk):
                     "capacidad": int(entry_cap.get()),
                     "precio_base": float(entry_precio.get())
                 }
-                resp = requests.put(
+                resp = self.http.put(
                     f"{self.url_base}/habitaciones/{habitacion['id_habitacion']}",
-                    json=datos,
-                    headers=self.headers
+                    json=datos
                 )
                 if resp.status_code == 200:
                     messagebox.showinfo("Éxito", "Habitación actualizada correctamente.")
@@ -261,6 +309,7 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("Error", f"Verifica los datos ingresados: {str(e)}")
 
         ctk.CTkButton(modal, text="Guardar Cambios", width=200, command=guardar_cambios).pack(pady=20)
+        self._mostrar_modal(modal)
 
     def crear_usuario(self):
         try:
@@ -270,7 +319,7 @@ class PanelPrincipal(ctk.CTk):
                 "password": self.entry_pass_user.get(),
                 "id_rol": int(self.combo_rol.get()[0])
             }
-            respuesta = requests.post(f"{self.url_base}/usuarios/", json=datos, headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/usuarios/", json=datos)
             if respuesta.status_code == 200:
                 messagebox.showinfo("Éxito", "Personal registrado exitosamente.")
                 self.limpiar_formulario_usuario()
@@ -294,7 +343,7 @@ class PanelPrincipal(ctk.CTk):
 
         nombres_roles = {1: "Admin", 2: "Recepción", 3: "Limpieza"}
         try:
-            respuesta = requests.get(f"{self.url_base}/usuarios/", headers=self.headers)
+            respuesta = self.http.get(f"{self.url_base}/usuarios/")
             if respuesta.status_code == 200:
                 for u in respuesta.json():
                     fila = ctk.CTkFrame(self.frame_lista_usuarios)
@@ -336,10 +385,9 @@ class PanelPrincipal(ctk.CTk):
 
     def cambiar_estado_usuario(self, id_usuario, nuevo_estado):
         try:
-            respuesta = requests.patch(
+            respuesta = self.http.patch(
                 f"{self.url_base}/usuarios/{id_usuario}/estado",
-                json={"estado_activo": nuevo_estado},
-                headers=self.headers
+                json={"estado_activo": nuevo_estado}
             )
             if respuesta.status_code == 200:
                 accion = "activado" if nuevo_estado else "desactivado (baja lógica)"
@@ -351,10 +399,7 @@ class PanelPrincipal(ctk.CTk):
             messagebox.showerror("Error", str(e))
 
     def abrir_modal_editar_usuario(self, usuario):
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"Editar Empleado #{usuario['id_usuario']}")
-        modal.geometry("360x360")
-        modal.grab_set()
+        modal = self._crear_modal(f"Editar Empleado #{usuario['id_usuario']}", "360x360")
 
         ctk.CTkLabel(modal, text=f"Editar a {usuario['nombre']}", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
@@ -387,10 +432,9 @@ class PanelPrincipal(ctk.CTk):
             if entry_pass.get().strip():
                 datos["password"] = entry_pass.get().strip()
             try:
-                resp = requests.put(
+                resp = self.http.put(
                     f"{self.url_base}/usuarios/{usuario['id_usuario']}",
-                    json=datos,
-                    headers=self.headers
+                    json=datos
                 )
                 if resp.status_code == 200:
                     messagebox.showinfo("Éxito", "Datos del usuario actualizados.")
@@ -402,26 +446,26 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("Error", str(e))
 
         ctk.CTkButton(modal, text="Guardar Cambios", width=200, command=guardar_cambios).pack(pady=15)
+        self._mostrar_modal(modal)
 
     def crear_placeholder(self, tab, texto):
         lbl = ctk.CTkLabel(tab, text=texto, font=ctk.CTkFont(size=22, weight="bold"), text_color="gray50")
         lbl.place(relx=0.5, rely=0.5, anchor="center")
 
     def cargar_habitaciones(self):
-        for widget in self.frame_lista.winfo_children():
-            widget.destroy()
-            
-        # Variables para controlar la cuadrícula (Grid)
-        self.columna_actual = 0
-        self.fila_actual = 0
-        self.max_columnas = 3 # Mostrará 3 tarjetas por fila
-        
         try:
-            respuesta = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
+            respuesta = self.http.get(f"{self.url_base}/habitaciones/")
             if respuesta.status_code == 200:
                 lista_habs = respuesta.json()
-                for hab in lista_habs:
-                    self.crear_tarjeta_habitacion(hab)
+                self.cache_habitaciones = lista_habs
+                if hasattr(self, "frame_lista"):
+                    for widget in self.frame_lista.winfo_children():
+                        widget.destroy()
+                    self.columna_actual = 0
+                    self.fila_actual = 0
+                    self.max_columnas = 3
+                    for hab in lista_habs:
+                        self.crear_tarjeta_habitacion(hab)
                 if hasattr(self, "actualizar_combo_habitaciones_reserva"):
                     self.actualizar_combo_habitaciones_reserva(lista_habs)
                 if hasattr(self, "actualizar_combo_habitaciones_mantenimiento"):
@@ -505,7 +549,7 @@ class PanelPrincipal(ctk.CTk):
     def actualizar_estado(self, id_habitacion, nuevo_estado):
         # Esta función ahora se ejecuta de forma "silenciosa" en el fondo
         try:
-            respuesta = requests.patch(f"{self.url_base}/habitaciones/{id_habitacion}/estado", json={"estado": nuevo_estado}, headers=self.headers)
+            respuesta = self.http.patch(f"{self.url_base}/habitaciones/{id_habitacion}/estado", json={"estado": nuevo_estado})
             if respuesta.status_code == 200:
                 self.cargar_habitaciones() # Refresca el panel entero para actualizar el color
             else:
@@ -516,6 +560,10 @@ class PanelPrincipal(ctk.CTk):
     def cerrar_sesion(self):
         respuesta = messagebox.askyesno("Cerrar Sesión", "¿Estás seguro de que deseas salir?")
         if respuesta:
+            try:
+                self.http.close()
+            except Exception:
+                pass
             self.destroy() # Destruye el panel y borra el token de la memoria
             
             # Importación local para evitar el error de importación circular
@@ -572,7 +620,7 @@ class PanelPrincipal(ctk.CTk):
         frame_hdr_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
         frame_hdr_h.pack(fill="x", padx=10, pady=(6, 2))
         ctk.CTkLabel(frame_hdr_h, text="Directorio de Huéspedes", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left")
-        ctk.CTkButton(frame_hdr_h, text="Refrescar", width=85, height=24, command=self.cargar_huespedes).pack(side="right")
+        ctk.CTkButton(frame_hdr_h, text="Refrescar", width=85, height=24, command=lambda: self.cargar_huespedes(forzar_red=True)).pack(side="right")
 
         frame_busqueda_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
         frame_busqueda_h.pack(fill="x", padx=10, pady=2)
@@ -582,7 +630,7 @@ class PanelPrincipal(ctk.CTk):
             height=26
         )
         self.entry_buscar_huesped.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        self.entry_buscar_huesped.bind("<KeyRelease>", lambda _e: self.cargar_huespedes())
+        self.entry_buscar_huesped.bind("<KeyRelease>", self._filtrar_huespedes_debounced)
         ctk.CTkButton(
             frame_busqueda_h,
             text="Limpiar",
@@ -704,9 +752,9 @@ class PanelPrincipal(ctk.CTk):
         self.frame_lista_reservas = ctk.CTkScrollableFrame(frame_res, height=150)
         self.frame_lista_reservas.pack(fill="both", expand=True, padx=8, pady=5)
 
-        self.cargar_huespedes()
+        self.cargar_huespedes(forzar_red=not bool(self.cache_huespedes))
         self.cargar_reservas()
-        self.actualizar_combo_habitaciones_reserva()
+        self.actualizar_combo_habitaciones_reserva(self.cache_habitaciones or None)
 
     def construir_pestana_folios(self):
         tab_fol = self.tabview.tab("Facturación y Folios")
@@ -929,7 +977,7 @@ class PanelPrincipal(ctk.CTk):
             command=self.limpiar_form_factura
         ).pack(side="left", padx=4)
 
-        self.actualizar_combo_reservas_folio()
+        self.actualizar_combo_reservas_folio(self.cache_reservas or None)
 
     def crear_huesped(self):
         try:
@@ -947,12 +995,12 @@ class PanelPrincipal(ctk.CTk):
                 "telefono": self.entry_h_tel.get().strip(),
                 "rfc": rfc_val
             }
-            respuesta = requests.post(f"{self.url_base}/huespedes/", json=datos, headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/huespedes/", json=datos)
             if respuesta.status_code in [200, 201]:
                 h_json = respuesta.json()
                 messagebox.showinfo("Éxito", f"Huésped registrado correctamente (ID: #{h_json.get('id_huesped')}).")
                 self.limpiar_formulario_huesped()
-                self.cargar_huespedes()
+                self.cargar_huespedes(forzar_red=True)
             elif respuesta.status_code == 422:
                 errores = respuesta.json().get("detail", [])
                 msg = "El RFC ingresado no tiene un formato fiscal válido."
@@ -975,18 +1023,30 @@ class PanelPrincipal(ctk.CTk):
     def limpiar_busqueda_huesped(self):
         if hasattr(self, "entry_buscar_huesped"):
             self.entry_buscar_huesped.delete(0, "end")
-            self.cargar_huespedes()
+            self.renderizar_huespedes()
+
+    def _filtrar_huespedes_debounced(self, _event=None):
+        if self._after_busq_huesped is not None:
+            try:
+                self.after_cancel(self._after_busq_huesped)
+            except Exception:
+                pass
+        self._after_busq_huesped = self.after(150, self.renderizar_huespedes)
 
     def actualizar_combo_habitaciones_reserva(self, lista_habs=None):
         if not hasattr(self, "combo_r_hab"):
             return
         try:
             if lista_habs is None:
-                resp = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
-                if resp.status_code == 200:
-                    lista_habs = resp.json()
+                if self.cache_habitaciones:
+                    lista_habs = self.cache_habitaciones
                 else:
-                    return
+                    resp = self.http.get(f"{self.url_base}/habitaciones/")
+                    if resp.status_code == 200:
+                        lista_habs = resp.json()
+                        self.cache_habitaciones = lista_habs
+                    else:
+                        return
             opciones = ["Seleccione una habitación..."] + [
                 f"ID {h['id_habitacion']} - Hab. {h['numero_habitacion']} ({h['tipo']} - ${float(h.get('precio_base', 0)):.0f} [{h['estado']}])"
                 for h in lista_habs
@@ -1006,7 +1066,21 @@ class PanelPrincipal(ctk.CTk):
         else:
             self._set_entry_readonly(self.entry_r_hab_id, "", "ID Habitación")
 
-    def cargar_huespedes(self):
+    def cargar_huespedes(self, forzar_red: bool = True):
+        if forzar_red or not self.cache_huespedes:
+            try:
+                resp = self.http.get(f"{self.url_base}/huespedes/")
+                if resp.status_code == 200:
+                    self.cache_huespedes = resp.json()
+                    self.mapa_huespedes = {
+                        h["id_huesped"]: (h.get("nombre_completo") or f"Huésped #{h['id_huesped']}")
+                        for h in self.cache_huespedes
+                    }
+            except requests.exceptions.ConnectionError:
+                pass
+        self.renderizar_huespedes()
+
+    def renderizar_huespedes(self):
         if not hasattr(self, "frame_lista_huespedes"):
             return
         for widget in self.frame_lista_huespedes.winfo_children():
@@ -1016,57 +1090,50 @@ class PanelPrincipal(ctk.CTk):
         if hasattr(self, "entry_buscar_huesped"):
             filtro = self.entry_buscar_huesped.get().strip().lower()
 
-        try:
-            resp = requests.get(f"{self.url_base}/huespedes/", headers=self.headers)
-            if resp.status_code == 200:
-                self.mapa_huespedes = {}
-                for h in resp.json():
-                    self.mapa_huespedes[h["id_huesped"]] = h.get("nombre_completo") or f"Huésped #{h['id_huesped']}"
-                    nombre = (h.get("nombre_completo") or "").lower()
-                    doc = (h.get("documento_identidad") or "").lower()
-                    rfc_h = (h.get("rfc") or "").lower()
-                    if filtro and filtro not in nombre and filtro not in doc and filtro not in rfc_h:
-                        continue
+        for h in self.cache_huespedes:
+            nombre = (h.get("nombre_completo") or "").lower()
+            doc = (h.get("documento_identidad") or "").lower()
+            rfc_h = (h.get("rfc") or "").lower()
+            if filtro and filtro not in nombre and filtro not in doc and filtro not in rfc_h:
+                continue
 
-                    fila = ctk.CTkFrame(self.frame_lista_huespedes)
-                    fila.pack(fill="x", pady=2, padx=2)
+            fila = ctk.CTkFrame(self.frame_lista_huespedes)
+            fila.pack(fill="x", pady=2, padx=2)
 
-                    doc_mostrar = h.get("documento_identidad") or "Sin especificar"
-                    rfc_sufijo = f" | RFC: {h['rfc']}" if h.get("rfc") else ""
-                    ctk.CTkLabel(
-                        fila,
-                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({doc_mostrar}{rfc_sufijo})",
-                        font=ctk.CTkFont(size=12)
-                    ).pack(side="left", padx=6, pady=4)
+            doc_mostrar = h.get("documento_identidad") or "Sin especificar"
+            rfc_sufijo = f" | RFC: {h['rfc']}" if h.get("rfc") else ""
+            ctk.CTkLabel(
+                fila,
+                text=f"#{h['id_huesped']} {h['nombre_completo']} ({doc_mostrar}{rfc_sufijo})",
+                font=ctk.CTkFont(size=12)
+            ).pack(side="left", padx=6, pady=4)
 
-                    ctk.CTkButton(
-                        fila,
-                        text="Usar ID",
-                        width=55,
-                        height=24,
-                        fg_color="#2E7D32",
-                        command=lambda hid=h["id_huesped"]: self.seleccionar_huesped_id(hid)
-                    ).pack(side="right", padx=2, pady=3)
+            ctk.CTkButton(
+                fila,
+                text="Usar ID",
+                width=55,
+                height=24,
+                fg_color="#2E7D32",
+                command=lambda hid=h["id_huesped"]: self.seleccionar_huesped_id(hid)
+            ).pack(side="right", padx=2, pady=3)
 
-                    ctk.CTkButton(
-                        fila,
-                        text="Eliminar",
-                        width=58,
-                        height=24,
-                        fg_color="#C62828",
-                        hover_color="#8E0000",
-                        command=lambda hid=h["id_huesped"], hnom=h["nombre_completo"]: self.eliminar_huesped_gui(hid, hnom)
-                    ).pack(side="right", padx=2, pady=3)
+            ctk.CTkButton(
+                fila,
+                text="Eliminar",
+                width=58,
+                height=24,
+                fg_color="#C62828",
+                hover_color="#8E0000",
+                command=lambda hid=h["id_huesped"], hnom=h["nombre_completo"]: self.eliminar_huesped_gui(hid, hnom)
+            ).pack(side="right", padx=2, pady=3)
 
-                    ctk.CTkButton(
-                        fila,
-                        text="Editar",
-                        width=52,
-                        height=24,
-                        command=lambda hdata=h: self.abrir_modal_editar_huesped(hdata)
-                    ).pack(side="right", padx=2, pady=3)
-        except requests.exceptions.ConnectionError:
-            pass
+            ctk.CTkButton(
+                fila,
+                text="Editar",
+                width=52,
+                height=24,
+                command=lambda hdata=h: self.abrir_modal_editar_huesped(hdata)
+            ).pack(side="right", padx=2, pady=3)
 
     def eliminar_huesped_gui(self, id_huesped: int, nombre: str):
         confirmar = messagebox.askyesno(
@@ -1076,12 +1143,12 @@ class PanelPrincipal(ctk.CTk):
         if not confirmar:
             return
         try:
-            resp = requests.delete(f"{self.url_base}/huespedes/{id_huesped}", headers=self.headers)
+            resp = self.http.delete(f"{self.url_base}/huespedes/{id_huesped}")
             if resp.status_code == 200:
                 messagebox.showinfo("Éxito", resp.json().get("mensaje", "Huésped eliminado correctamente."))
                 if self.entry_r_huesped_id.get().strip() == str(id_huesped):
                     self._set_entry_readonly(self.entry_r_huesped_id, "", "ID Huésped (Usar ID)")
-                self.cargar_huespedes()
+                self.cargar_huespedes(forzar_red=True)
             else:
                 detalle = resp.json().get("detail", resp.text)
                 messagebox.showerror("No se puede eliminar", detalle)
@@ -1092,10 +1159,7 @@ class PanelPrincipal(ctk.CTk):
         self._set_entry_readonly(self.entry_r_huesped_id, str(id_huesped), "ID Huésped (Usar ID)")
 
     def abrir_modal_editar_huesped(self, huesped):
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"Editar Huésped #{huesped['id_huesped']}")
-        modal.geometry("350x380")
-        modal.grab_set()
+        modal = self._crear_modal(f"Editar Huésped #{huesped['id_huesped']}", "350x380")
 
         ctk.CTkLabel(modal, text=f"Editar Huésped #{huesped['id_huesped']}", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=12)
 
@@ -1134,15 +1198,14 @@ class PanelPrincipal(ctk.CTk):
                 "rfc": e_rfc.get().strip() or None,
             }
             try:
-                r = requests.put(
+                r = self.http.put(
                     f"{self.url_base}/huespedes/{huesped['id_huesped']}",
-                    json=datos,
-                    headers=self.headers
+                    json=datos
                 )
                 if r.status_code == 200:
                     messagebox.showinfo("Éxito", "Datos del huésped actualizados.")
                     modal.destroy()
-                    self.cargar_huespedes()
+                    self.cargar_huespedes(forzar_red=True)
                     self.cargar_reservas()
                 elif r.status_code == 422:
                     errores = r.json().get("detail", [])
@@ -1156,13 +1219,10 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("Error", str(e))
 
         ctk.CTkButton(modal, text="Guardar Cambios", width=180, command=guardar).pack(pady=15)
+        self._mostrar_modal(modal)
 
     def abrir_mini_calendario(self, entry_destino, titulo="Seleccionar Fecha", es_entrada=True):
-        modal = ctk.CTkToplevel(self)
-        modal.title(titulo)
-        modal.geometry("320x330")
-        modal.resizable(False, False)
-        modal.grab_set()
+        modal = self._crear_modal(titulo, "320x330")
 
         # Determinar mes/año inicial a partir del campo o la fecha actual
         hoy = date.today()
@@ -1287,6 +1347,7 @@ class PanelPrincipal(ctk.CTk):
         ).pack(side="right", padx=4)
 
         renderizar_mes()
+        self._mostrar_modal(modal)
 
     def limpiar_formulario_reserva(self):
         self.combo_r_hab.set("Seleccione una habitación...")
@@ -1296,11 +1357,6 @@ class PanelPrincipal(ctk.CTk):
         self._set_entry_readonly(self.entry_r_f_salida, "", "Salida")
 
     def cargar_reservas(self):
-        if not hasattr(self, "frame_lista_reservas"):
-            return
-        for widget in self.frame_lista_reservas.winfo_children():
-            widget.destroy()
-
         colores_res = {
             "Confirmada": "#64B5F6",
             "Activa": "#66BB6A",
@@ -1308,39 +1364,43 @@ class PanelPrincipal(ctk.CTk):
             "Cancelada": "#EF5350",
         }
         try:
-            resp = requests.get(f"{self.url_base}/reservas/", headers=self.headers)
+            resp = self.http.get(f"{self.url_base}/reservas/")
             if resp.status_code == 200:
                 lista_res = resp.json()
-                for r in lista_res:
-                    fila = ctk.CTkFrame(self.frame_lista_reservas)
-                    fila.pack(fill="x", pady=2, padx=2)
+                self.cache_reservas = lista_res
+                if hasattr(self, "frame_lista_reservas"):
+                    for widget in self.frame_lista_reservas.winfo_children():
+                        widget.destroy()
+                    for r in lista_res:
+                        fila = ctk.CTkFrame(self.frame_lista_reservas)
+                        fila.pack(fill="x", pady=2, padx=2)
 
-                    est = r.get("estado_reserva", "")
-                    color_txt = colores_res.get(est, "white")
-                    nombre_huesped = (
-                        r.get("nombre_huesped")
-                        or getattr(self, "mapa_huespedes", {}).get(r.get("id_huesped"))
-                        or f"Huésped #{r.get('id_huesped')}"
-                    )
-                    hab_txt = r.get("numeros_habitaciones") or "Sin hab."
-                    texto = (
-                        f"Reserva #{r['id_reserva']} | {nombre_huesped} | Hab. {hab_txt} | "
-                        f"{r['fecha_entrada']} -> {r['fecha_salida']} [{est}]"
-                    )
-                    ctk.CTkLabel(
-                        fila,
-                        text=texto,
-                        text_color=color_txt,
-                        font=ctk.CTkFont(size=11, weight="bold")
-                    ).pack(side="left", padx=6, pady=4)
+                        est = r.get("estado_reserva", "")
+                        color_txt = colores_res.get(est, "white")
+                        nombre_huesped = (
+                            r.get("nombre_huesped")
+                            or getattr(self, "mapa_huespedes", {}).get(r.get("id_huesped"))
+                            or f"Huésped #{r.get('id_huesped')}"
+                        )
+                        hab_txt = r.get("numeros_habitaciones") or "Sin hab."
+                        texto = (
+                            f"Reserva #{r['id_reserva']} | {nombre_huesped} | Hab. {hab_txt} | "
+                            f"{r['fecha_entrada']} -> {r['fecha_salida']} [{est}]"
+                        )
+                        ctk.CTkLabel(
+                            fila,
+                            text=texto,
+                            text_color=color_txt,
+                            font=ctk.CTkFont(size=11, weight="bold")
+                        ).pack(side="left", padx=6, pady=4)
 
-                    ctk.CTkButton(
-                        fila,
-                        text="Seleccionar",
-                        width=75,
-                        height=24,
-                        command=lambda rid=r["id_reserva"]: self.seleccionar_reserva_id(rid)
-                    ).pack(side="right", padx=4, pady=3)
+                        ctk.CTkButton(
+                            fila,
+                            text="Seleccionar",
+                            width=75,
+                            height=24,
+                            command=lambda rid=r["id_reserva"]: self.seleccionar_reserva_id(rid)
+                        ).pack(side="right", padx=4, pady=3)
                 if hasattr(self, "actualizar_combo_reservas_folio"):
                     self.actualizar_combo_reservas_folio(lista_res)
         except requests.exceptions.ConnectionError:
@@ -1348,6 +1408,8 @@ class PanelPrincipal(ctk.CTk):
 
     def seleccionar_reserva_id(self, id_reserva):
         self._set_entry_readonly(self.entry_checkin_id, str(id_reserva), "ID de Reserva")
+        if self.id_rol in (1, 2):
+            self._asegurar_pestana("Facturación y Folios")
         if hasattr(self, "entry_folio_reserva_id"):
             self._set_entry_readonly(self.entry_folio_reserva_id, str(id_reserva), "ID Reserva")
             self.consultar_folio()
@@ -1371,7 +1433,7 @@ class PanelPrincipal(ctk.CTk):
                 "id_huesped": int(self.entry_r_huesped_id.get()),
                 "id_habitacion": int(self.entry_r_hab_id.get())
             }
-            respuesta = requests.post(f"{self.url_base}/reservas/", json=datos, headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/reservas/", json=datos)
             if respuesta.status_code in [200, 201]:
                 res_json = respuesta.json()
                 messagebox.showinfo("Éxito", f"Reserva creada con éxito. ID Asignado: {res_json.get('id_reserva')}")
@@ -1397,7 +1459,7 @@ class PanelPrincipal(ctk.CTk):
             )
             if not confirmar:
                 return
-            respuesta = requests.patch(f"{self.url_base}/reservas/{reserva_id}/cancelar", headers=self.headers)
+            respuesta = self.http.patch(f"{self.url_base}/reservas/{reserva_id}/cancelar")
             if respuesta.status_code == 200:
                 data = respuesta.json()
                 messagebox.showinfo("Reserva Cancelada", data.get("mensaje", "Reserva cancelada con éxito."))
@@ -1414,7 +1476,7 @@ class PanelPrincipal(ctk.CTk):
             if not reserva_id:
                 messagebox.showwarning("Advertencia", "Por favor ingresa un ID de reserva.")
                 return
-            respuesta = requests.post(f"{self.url_base}/reservas/{reserva_id}/checkin", headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/reservas/{reserva_id}/checkin")
             if respuesta.status_code == 200:
                 data = respuesta.json()
                 cargo_gen = data.get("cargo_hospedaje_generado", 0.0)
@@ -1438,7 +1500,7 @@ class PanelPrincipal(ctk.CTk):
             if not reserva_id:
                 messagebox.showwarning("Advertencia", "Por favor ingresa un ID de reserva.")
                 return
-            respuesta = requests.post(f"{self.url_base}/reservas/{reserva_id}/checkout", headers=self.headers)
+            respuesta = self.http.post(f"{self.url_base}/reservas/{reserva_id}/checkout")
             if respuesta.status_code == 200:
                 data = respuesta.json()
                 messagebox.showinfo(
@@ -1460,11 +1522,15 @@ class PanelPrincipal(ctk.CTk):
             return
         try:
             if lista_res is None:
-                resp = requests.get(f"{self.url_base}/reservas/", headers=self.headers)
-                if resp.status_code == 200:
-                    lista_res = resp.json()
+                if self.cache_reservas:
+                    lista_res = self.cache_reservas
                 else:
-                    return
+                    resp = self.http.get(f"{self.url_base}/reservas/")
+                    if resp.status_code == 200:
+                        lista_res = resp.json()
+                        self.cache_reservas = lista_res
+                    else:
+                        return
             opciones = ["Seleccione una reserva..."]
             for r in lista_res:
                 nom = r.get("nombre_huesped") or getattr(self, "mapa_huespedes", {}).get(r.get("id_huesped")) or f"Huésped #{r.get('id_huesped')}"
@@ -1513,7 +1579,7 @@ class PanelPrincipal(ctk.CTk):
             if not reserva_id:
                 messagebox.showwarning("Advertencia", "Seleccione una reserva del menú desplegable.")
                 return
-            respuesta = requests.get(f"{self.url_base}/reservas/{reserva_id}", headers=self.headers)
+            respuesta = self.http.get(f"{self.url_base}/reservas/{reserva_id}")
             if respuesta.status_code == 200:
                 data = respuesta.json()
                 nom_h = data.get("nombre_huesped") or f"Huésped #{data.get('id_huesped')}"
@@ -1629,7 +1695,7 @@ class PanelPrincipal(ctk.CTk):
                 "descripcion": desc,
                 "monto": monto,
             }
-            resp = requests.post(f"{self.url_base}/finanzas/cargos", json=datos, headers=self.headers)
+            resp = self.http.post(f"{self.url_base}/finanzas/cargos", json=datos)
             if resp.status_code in (200, 201):
                 messagebox.showinfo("Cargo Registrado", f"Cargo '{desc}' por ${monto:.2f} agregado al Folio.")
                 self.limpiar_form_cargo()
@@ -1660,7 +1726,7 @@ class PanelPrincipal(ctk.CTk):
                 "metodo_pago": metodo_pago_str,
                 "monto": monto,
             }
-            resp = requests.post(f"{self.url_base}/finanzas/pagos", json=datos, headers=self.headers)
+            resp = self.http.post(f"{self.url_base}/finanzas/pagos", json=datos)
             if resp.status_code in (200, 201):
                 pago_json = resp.json()
                 messagebox.showinfo(
@@ -1711,11 +1777,7 @@ class PanelPrincipal(ctk.CTk):
             messagebox.showerror("Monto inválido", "El monto debe ser un número válido.")
 
     def abrir_simulador_terminal_pinpad(self, id_reserva: int, monto: float):
-        modal = ctk.CTkToplevel(self)
-        modal.title("Terminal Bancaria PinPad")
-        modal.geometry("390x430")
-        modal.resizable(False, False)
-        modal.grab_set()
+        modal = self._crear_modal("Terminal Bancaria PinPad", "390x430")
 
         ctk.CTkLabel(
             modal,
@@ -1853,6 +1915,7 @@ class PanelPrincipal(ctk.CTk):
             hover_color="gray30",
             command=modal.destroy
         ).pack(pady=(6, 10))
+        self._mostrar_modal(modal)
 
     def limpiar_form_factura(self):
         self.entry_fac_rfc.delete(0, "end")
@@ -2087,7 +2150,7 @@ class PanelPrincipal(ctk.CTk):
                 "rfc_cliente": rfc,
                 "razon_social": razon,
             }
-            resp = requests.post(f"{self.url_base}/finanzas/facturar", json=datos, headers=self.headers)
+            resp = self.http.post(f"{self.url_base}/finanzas/facturar", json=datos)
             if resp.status_code == 200:
                 fac = resp.json()
                 ruta_pdf = self.generar_pdf_factura(fac)
@@ -2106,7 +2169,7 @@ class PanelPrincipal(ctk.CTk):
                     f"Total Facturado: ${fac.get('total_facturado', 0):.2f}\n\n"
                     f"Archivo PDF guardado en:\n{ruta_pdf}"
                 )
-                self.cargar_huespedes()
+                self.cargar_huespedes(forzar_red=True)
             elif resp.status_code == 422:
                 errores = resp.json().get("detail", [])
                 msg = "El RFC ingresado no cumple con la estructura fiscal válida."
@@ -2276,7 +2339,7 @@ class PanelPrincipal(ctk.CTk):
             text="Refrescar Bitácora",
             width=130,
             height=26,
-            command=self.cargar_tickets_mantenimiento
+            command=lambda: self.cargar_tickets_mantenimiento(forzar_red=True)
         ).pack(side="right")
 
         # Tarjetas KPI de Mantenimiento
@@ -2305,7 +2368,7 @@ class PanelPrincipal(ctk.CTk):
             width=155,
             height=26,
             values=["Todos los estados", "Activos", "Pendiente", "En Reparación", "Resuelto"],
-            command=lambda _v: self.cargar_tickets_mantenimiento()
+            command=lambda _v: self.renderizar_tickets_mantenimiento()
         )
         self.combo_filtro_tickets.set("Todos los estados")
         self.combo_filtro_tickets.pack(side="left", padx=(0, 4))
@@ -2315,7 +2378,7 @@ class PanelPrincipal(ctk.CTk):
             width=145,
             height=26,
             values=["Todas prioridades", "Crítica", "Alta", "Media", "Baja"],
-            command=lambda _v: self.cargar_tickets_mantenimiento()
+            command=lambda _v: self.renderizar_tickets_mantenimiento()
         )
         self.combo_filtro_prio.set("Todas prioridades")
         self.combo_filtro_prio.pack(side="left", padx=4)
@@ -2326,7 +2389,7 @@ class PanelPrincipal(ctk.CTk):
             height=26
         )
         self.entry_buscar_ticket.pack(side="left", fill="x", expand=True, padx=4)
-        self.entry_buscar_ticket.bind("<KeyRelease>", lambda _e: self.cargar_tickets_mantenimiento())
+        self.entry_buscar_ticket.bind("<KeyRelease>", self._filtrar_tickets_debounced)
 
         ctk.CTkButton(
             frame_filtros_m,
@@ -2341,25 +2404,37 @@ class PanelPrincipal(ctk.CTk):
         self.frame_lista_tickets = ctk.CTkScrollableFrame(frame_der_m)
         self.frame_lista_tickets.pack(fill="both", expand=True, padx=10, pady=(2, 10))
 
-        self.actualizar_combo_habitaciones_mantenimiento()
-        self.cargar_tickets_mantenimiento()
+        self.actualizar_combo_habitaciones_mantenimiento(self.cache_habitaciones or None)
+        self.cargar_tickets_mantenimiento(forzar_red=not bool(self.cache_tickets))
 
     def limpiar_filtros_mantenimiento(self):
         self.combo_filtro_tickets.set("Todos los estados")
         self.combo_filtro_prio.set("Todas prioridades")
         self.entry_buscar_ticket.delete(0, "end")
-        self.cargar_tickets_mantenimiento()
+        self.renderizar_tickets_mantenimiento()
+
+    def _filtrar_tickets_debounced(self, _event=None):
+        if self._after_busq_ticket is not None:
+            try:
+                self.after_cancel(self._after_busq_ticket)
+            except Exception:
+                pass
+        self._after_busq_ticket = self.after(150, self.renderizar_tickets_mantenimiento)
 
     def actualizar_combo_habitaciones_mantenimiento(self, lista_habs=None):
         if not hasattr(self, "combo_mant_hab"):
             return
         try:
             if lista_habs is None:
-                resp = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
-                if resp.status_code == 200:
-                    lista_habs = resp.json()
+                if self.cache_habitaciones:
+                    lista_habs = self.cache_habitaciones
                 else:
-                    return
+                    resp = self.http.get(f"{self.url_base}/habitaciones/")
+                    if resp.status_code == 200:
+                        lista_habs = resp.json()
+                        self.cache_habitaciones = lista_habs
+                    else:
+                        return
             self.mapa_hab_mantenimiento = {}
             opciones = ["Seleccione una habitación..."]
             for h in lista_habs:
@@ -2405,7 +2480,7 @@ class PanelPrincipal(ctk.CTk):
                 "prioridad": prioridad,
                 "descripcion_falla": desc,
             }
-            resp = requests.post(f"{self.url_base}/mantenimiento/", json=datos, headers=self.headers)
+            resp = self.http.post(f"{self.url_base}/mantenimiento/", json=datos)
             if resp.status_code in (200, 201):
                 t_json = resp.json()
                 messagebox.showinfo(
@@ -2416,7 +2491,7 @@ class PanelPrincipal(ctk.CTk):
                 )
                 self.limpiar_form_mantenimiento()
                 self.cargar_habitaciones()
-                self.cargar_tickets_mantenimiento()
+                self.cargar_tickets_mantenimiento(forzar_red=True)
             else:
                 detalle = self._extraer_detalle_error(resp)
                 messagebox.showerror("No se pudo levantar el ticket", detalle)
@@ -2428,10 +2503,9 @@ class PanelPrincipal(ctk.CTk):
             payload = {"estado_ticket": nuevo_estado}
             if nota_resolucion is not None:
                 payload["nota_resolucion"] = nota_resolucion
-            resp = requests.patch(
+            resp = self.http.patch(
                 f"{self.url_base}/mantenimiento/{id_ticket}/estado",
-                json=payload,
-                headers=self.headers
+                json=payload
             )
             if resp.status_code == 200:
                 if nuevo_estado == "Resuelto":
@@ -2441,7 +2515,7 @@ class PanelPrincipal(ctk.CTk):
                         f"La habitación pasó a estado 'Sucia' para su limpieza."
                     )
                 self.cargar_habitaciones()
-                self.cargar_tickets_mantenimiento()
+                self.cargar_tickets_mantenimiento(forzar_red=True)
                 return True
             else:
                 detalle = self._extraer_detalle_error(resp)
@@ -2452,11 +2526,7 @@ class PanelPrincipal(ctk.CTk):
             return False
 
     def abrir_modal_resolver_ticket(self, ticket: dict):
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"Resolver Ticket #{ticket['id_ticket']}")
-        modal.geometry("390x280")
-        modal.resizable(False, False)
-        modal.grab_set()
+        modal = self._crear_modal(f"Resolver Ticket #{ticket['id_ticket']}", "390x280")
 
         num_hab = str(ticket.get("numero_habitacion") or ticket.get("id_habitacion") or "S/N")
         ctk.CTkLabel(
@@ -2485,7 +2555,6 @@ class PanelPrincipal(ctk.CTk):
             placeholder_text="Ej. Se reemplazó empaque y se verificó presión..."
         )
         entry_nota.pack(pady=6)
-        entry_nota.focus_set()
 
         def confirmar():
             nota = entry_nota.get().strip() or "Reparación verificada y concluida satisfactoriamente."
@@ -2510,13 +2579,11 @@ class PanelPrincipal(ctk.CTk):
             hover_color="gray30",
             command=modal.destroy
         ).pack(side="left", padx=4)
+        self._mostrar_modal(modal)
+        entry_nota.focus_set()
 
     def abrir_modal_editar_ticket(self, ticket: dict):
-        modal = ctk.CTkToplevel(self)
-        modal.title(f"Editar Ticket #{ticket['id_ticket']}")
-        modal.geometry("380x320")
-        modal.resizable(False, False)
-        modal.grab_set()
+        modal = self._crear_modal(f"Editar Ticket #{ticket['id_ticket']}", "380x320")
 
         ctk.CTkLabel(
             modal,
@@ -2548,25 +2615,25 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showwarning("Campo obligatorio", "La descripción no puede quedar vacía.")
                 return
             try:
-                resp = requests.put(
+                resp = self.http.put(
                     f"{self.url_base}/mantenimiento/{ticket['id_ticket']}",
                     json={
                         "categoria": combo_cat.get(),
                         "prioridad": combo_prio.get(),
                         "descripcion_falla": nueva_desc,
                     },
-                    headers=self.headers,
                 )
                 if resp.status_code == 200:
                     messagebox.showinfo("Éxito", f"Ticket #{ticket['id_ticket']} actualizado.")
                     modal.destroy()
-                    self.cargar_tickets_mantenimiento()
+                    self.cargar_tickets_mantenimiento(forzar_red=True)
                 else:
                     messagebox.showerror("Error", self._extraer_detalle_error(resp))
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
         ctk.CTkButton(modal, text="Guardar Cambios", width=180, command=guardar).pack(pady=16)
+        self._mostrar_modal(modal)
 
     def eliminar_ticket_gui(self, ticket: dict):
         id_t = ticket["id_ticket"]
@@ -2579,16 +2646,26 @@ class PanelPrincipal(ctk.CTk):
         if not confirmar:
             return
         try:
-            resp = requests.delete(f"{self.url_base}/mantenimiento/{id_t}", headers=self.headers)
+            resp = self.http.delete(f"{self.url_base}/mantenimiento/{id_t}")
             if resp.status_code == 200:
                 self.cargar_habitaciones()
-                self.cargar_tickets_mantenimiento()
+                self.cargar_tickets_mantenimiento(forzar_red=True)
             else:
                 messagebox.showerror("Error", self._extraer_detalle_error(resp))
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    def cargar_tickets_mantenimiento(self):
+    def cargar_tickets_mantenimiento(self, forzar_red: bool = True):
+        if forzar_red or not self.cache_tickets:
+            try:
+                resp = self.http.get(f"{self.url_base}/mantenimiento/")
+                if resp.status_code == 200:
+                    self.cache_tickets = resp.json()
+            except requests.exceptions.ConnectionError:
+                pass
+        self.renderizar_tickets_mantenimiento()
+
+    def renderizar_tickets_mantenimiento(self):
         if not hasattr(self, "frame_lista_tickets"):
             return
         for w in self.frame_lista_tickets.winfo_children():
@@ -2610,162 +2687,158 @@ class PanelPrincipal(ctk.CTk):
             "Baja": "#455A64",
         }
 
-        try:
-            resp = requests.get(f"{self.url_base}/mantenimiento/", headers=self.headers)
-            if resp.status_code == 200:
-                tickets = resp.json()
-                pend_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "Pendiente")
-                rep_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "En Reparación")
-                crit_cnt = sum(
-                    1 for t in tickets
-                    if t.get("estado_ticket") != "Resuelto" and t.get("prioridad") == "Crítica"
-                )
-                res_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "Resuelto")
+        tickets = self.cache_tickets
+        pend_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "Pendiente")
+        rep_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "En Reparación")
+        crit_cnt = sum(
+            1 for t in tickets
+            if t.get("estado_ticket") != "Resuelto" and t.get("prioridad") == "Crítica"
+        )
+        res_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "Resuelto")
 
-                if hasattr(self, "kpi_mant_pendientes"):
-                    self.kpi_mant_pendientes.configure(text=str(pend_cnt))
-                    self.kpi_mant_reparacion.configure(text=str(rep_cnt))
-                    self.kpi_mant_criticos.configure(text=str(crit_cnt))
-                    self.kpi_mant_resueltos.configure(text=str(res_cnt))
+        if hasattr(self, "kpi_mant_pendientes"):
+            self.kpi_mant_pendientes.configure(text=str(pend_cnt))
+            self.kpi_mant_reparacion.configure(text=str(rep_cnt))
+            self.kpi_mant_criticos.configure(text=str(crit_cnt))
+            self.kpi_mant_resueltos.configure(text=str(res_cnt))
 
-                mostrados = 0
-                for t in tickets:
-                    est = t.get("estado_ticket", "Pendiente")
-                    prio = t.get("prioridad") or "Media"
-                    cat = t.get("categoria") or "General"
+        mostrados = 0
+        for t in tickets:
+            est = t.get("estado_ticket", "Pendiente")
+            prio = t.get("prioridad") or "Media"
+            cat = t.get("categoria") or "General"
 
-                    if filtro_estado == "Activos" and est == "Resuelto":
-                        continue
-                    elif filtro_estado in ("Pendiente", "En Reparación", "Resuelto") and est != filtro_estado:
-                        continue
+            if filtro_estado == "Activos" and est == "Resuelto":
+                continue
+            elif filtro_estado in ("Pendiente", "En Reparación", "Resuelto") and est != filtro_estado:
+                continue
 
-                    if filtro_prio != "Todas prioridades" and prio != filtro_prio:
-                        continue
+            if filtro_prio != "Todas prioridades" and prio != filtro_prio:
+                continue
 
-                    num_hab = str(t.get("numero_habitacion") or t.get("id_habitacion") or "S/N")
-                    desc = t.get("descripcion_falla") or ""
-                    nota_res = t.get("nota_resolucion") or ""
-                    reporta = t.get("nombre_usuario_reporta") or "Personal"
+            num_hab = str(t.get("numero_habitacion") or t.get("id_habitacion") or "S/N")
+            desc = t.get("descripcion_falla") or ""
+            nota_res = t.get("nota_resolucion") or ""
+            reporta = t.get("nombre_usuario_reporta") or "Personal"
 
-                    if (
-                        texto_busq
-                        and texto_busq not in num_hab.lower()
-                        and texto_busq not in desc.lower()
-                        and texto_busq not in cat.lower()
-                    ):
-                        continue
+            if (
+                texto_busq
+                and texto_busq not in num_hab.lower()
+                and texto_busq not in desc.lower()
+                and texto_busq not in cat.lower()
+                and texto_busq not in nota_res.lower()
+            ):
+                continue
 
-                    mostrados += 1
-                    card = ctk.CTkFrame(self.frame_lista_tickets)
-                    card.pack(fill="x", padx=4, pady=4)
+            mostrados += 1
+            card = ctk.CTkFrame(self.frame_lista_tickets)
+            card.pack(fill="x", padx=4, pady=4)
 
-                    frame_info = ctk.CTkFrame(card, fg_color="transparent")
-                    frame_info.pack(side="left", fill="x", expand=True, padx=8, pady=6)
+            frame_info = ctk.CTkFrame(card, fg_color="transparent")
+            frame_info.pack(side="left", fill="x", expand=True, padx=8, pady=6)
 
-                    # Fila superior de la tarjeta: Título + Insignia de Prioridad
-                    fila_titulo = ctk.CTkFrame(frame_info, fg_color="transparent")
-                    fila_titulo.pack(fill="x")
+            # Fila superior de la tarjeta: Título + Insignia de Prioridad
+            fila_titulo = ctk.CTkFrame(frame_info, fg_color="transparent")
+            fila_titulo.pack(fill="x")
 
-                    color_est = colores_ticket.get(est, "white")
-                    ctk.CTkLabel(
-                        fila_titulo,
-                        text=f"Ticket #{t['id_ticket']}  |  Hab. {num_hab}  |  {cat}  |  [{est}]",
-                        font=ctk.CTkFont(size=13, weight="bold"),
-                        text_color=color_est,
-                        anchor="w"
-                    ).pack(side="left")
+            color_est = colores_ticket.get(est, "white")
+            ctk.CTkLabel(
+                fila_titulo,
+                text=f"Ticket #{t['id_ticket']}  |  Hab. {num_hab}  |  {cat}  |  [{est}]",
+                font=ctk.CTkFont(size=13, weight="bold"),
+                text_color=color_est,
+                anchor="w"
+            ).pack(side="left")
 
-                    color_p = colores_prioridad.get(prio, "#1976D2")
-                    lbl_prio = ctk.CTkLabel(
-                        fila_titulo,
-                        text=f" Prioridad: {prio} ",
-                        font=ctk.CTkFont(size=10, weight="bold"),
-                        fg_color=color_p,
-                        text_color="white",
-                        corner_radius=5
-                    )
-                    lbl_prio.pack(side="left", padx=8)
+            color_p = colores_prioridad.get(prio, "#1976D2")
+            lbl_prio = ctk.CTkLabel(
+                fila_titulo,
+                text=f" Prioridad: {prio} ",
+                font=ctk.CTkFont(size=10, weight="bold"),
+                fg_color=color_p,
+                text_color="white",
+                corner_radius=5
+            )
+            lbl_prio.pack(side="left", padx=8)
 
-                    ctk.CTkLabel(
-                        frame_info,
-                        text=f"Falla: {desc}",
-                        font=ctk.CTkFont(size=12),
-                        text_color="white",
-                        anchor="w"
-                    ).pack(fill="x", pady=(2, 1))
+            ctk.CTkLabel(
+                frame_info,
+                text=f"Falla: {desc}",
+                font=ctk.CTkFont(size=12),
+                text_color="white",
+                anchor="w"
+            ).pack(fill="x", pady=(2, 1))
 
-                    if nota_res:
-                        ctk.CTkLabel(
-                            frame_info,
-                            text=f"✔ Solución aplicada: {nota_res}",
-                            font=ctk.CTkFont(size=11, weight="bold"),
-                            text_color="#81C784",
-                            anchor="w"
-                        ).pack(fill="x", pady=(0, 2))
+            if nota_res:
+                ctk.CTkLabel(
+                    frame_info,
+                    text=f"✔ Solución aplicada: {nota_res}",
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    text_color="#81C784",
+                    anchor="w"
+                ).pack(fill="x", pady=(0, 2))
 
-                    f_crea = (t.get("fecha_creacion") or "")[:19].replace("T", " ")
-                    f_res = (t.get("fecha_resolucion") or "")[:19].replace("T", " ")
-                    meta_txt = f"Reportó: {reporta}  |  Creado: {f_crea}"
-                    if f_res:
-                        meta_txt += f"  |  Resuelto: {f_res}"
+            f_crea = (t.get("fecha_creacion") or "")[:19].replace("T", " ")
+            f_res = (t.get("fecha_resolucion") or "")[:19].replace("T", " ")
+            meta_txt = f"Reportó: {reporta}  |  Creado: {f_crea}"
+            if f_res:
+                meta_txt += f"  |  Resuelto: {f_res}"
 
-                    ctk.CTkLabel(
-                        frame_info,
-                        text=meta_txt,
-                        font=ctk.CTkFont(size=10),
-                        text_color="gray65",
-                        anchor="w"
-                    ).pack(fill="x")
+            ctk.CTkLabel(
+                frame_info,
+                text=meta_txt,
+                font=ctk.CTkFont(size=10),
+                text_color="gray65",
+                anchor="w"
+            ).pack(fill="x")
 
-                    frame_acc = ctk.CTkFrame(card, fg_color="transparent")
-                    frame_acc.pack(side="right", padx=6, pady=6)
+            frame_acc = ctk.CTkFrame(card, fg_color="transparent")
+            frame_acc.pack(side="right", padx=6, pady=6)
 
-                    ctk.CTkButton(
-                        frame_acc,
-                        text="Eliminar",
-                        width=62,
-                        height=25,
-                        fg_color="#C62828",
-                        hover_color="#8E0000",
-                        command=lambda tk_obj=t: self.eliminar_ticket_gui(tk_obj)
-                    ).pack(side="right", padx=2)
+            ctk.CTkButton(
+                frame_acc,
+                text="Eliminar",
+                width=62,
+                height=25,
+                fg_color="#C62828",
+                hover_color="#8E0000",
+                command=lambda tk_obj=t: self.eliminar_ticket_gui(tk_obj)
+            ).pack(side="right", padx=2)
 
-                    ctk.CTkButton(
-                        frame_acc,
-                        text="Editar",
-                        width=55,
-                        height=25,
-                        command=lambda tk_obj=t: self.abrir_modal_editar_ticket(tk_obj)
-                    ).pack(side="right", padx=2)
+            ctk.CTkButton(
+                frame_acc,
+                text="Editar",
+                width=55,
+                height=25,
+                command=lambda tk_obj=t: self.abrir_modal_editar_ticket(tk_obj)
+            ).pack(side="right", padx=2)
 
-                    if est != "Resuelto":
-                        ctk.CTkButton(
-                            frame_acc,
-                            text="Resolver",
-                            width=75,
-                            height=25,
-                            fg_color="#2E7D32",
-                            hover_color="#1b5e20",
-                            command=lambda tk_obj=t: self.abrir_modal_resolver_ticket(tk_obj)
-                        ).pack(side="right", padx=2)
+            if est != "Resuelto":
+                ctk.CTkButton(
+                    frame_acc,
+                    text="Resolver",
+                    width=75,
+                    height=25,
+                    fg_color="#2E7D32",
+                    hover_color="#1b5e20",
+                    command=lambda tk_obj=t: self.abrir_modal_resolver_ticket(tk_obj)
+                ).pack(side="right", padx=2)
 
-                    if est == "Pendiente":
-                        ctk.CTkButton(
-                            frame_acc,
-                            text="En Reparación",
-                            width=96,
-                            height=25,
-                            fg_color="#0277BD",
-                            hover_color="#01579B",
-                            command=lambda tid=t["id_ticket"], nh=num_hab: self.cambiar_estado_ticket_gui(tid, "En Reparación", nh)
-                        ).pack(side="right", padx=2)
+            if est == "Pendiente":
+                ctk.CTkButton(
+                    frame_acc,
+                    text="En Reparación",
+                    width=96,
+                    height=25,
+                    fg_color="#0277BD",
+                    hover_color="#01579B",
+                    command=lambda tid=t["id_ticket"], nh=num_hab: self.cambiar_estado_ticket_gui(tid, "En Reparación", nh)
+                ).pack(side="right", padx=2)
 
-                if mostrados == 0:
-                    ctk.CTkLabel(
-                        self.frame_lista_tickets,
-                        text="No hay tickets de mantenimiento para el filtro seleccionado.",
-                        text_color="gray60",
-                        font=ctk.CTkFont(size=12)
-                    ).pack(pady=20)
-        except requests.exceptions.ConnectionError:
-            pass
+        if mostrados == 0:
+            ctk.CTkLabel(
+                self.frame_lista_tickets,
+                text="No hay tickets de mantenimiento para el filtro seleccionado.",
+                text_color="gray60",
+                font=ctk.CTkFont(size=12)
+            ).pack(pady=20)

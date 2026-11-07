@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.reservas_folios import ReservaFolio
 from app.schemas.reservas_folios import ReservaCrear
 from app.models.habitaciones import Habitacion
@@ -55,11 +55,22 @@ def crear_reserva(db: Session, reserva: ReservaCrear):
     return db_reserva
 
 def obtener_reserva(db: Session, reserva_id: int):
-    return db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
+    return (
+        db.query(ReservaFolio)
+        .options(joinedload(ReservaFolio.huesped), joinedload(ReservaFolio.habitaciones))
+        .filter(ReservaFolio.id_reserva == reserva_id)
+        .first()
+    )
 
 def obtener_reservas(db: Session, skip: int = 0, limit: int = 100):
-    from app.models.reservas_folios import ReservaFolio
-    return db.query(ReservaFolio).order_by(ReservaFolio.id_reserva.desc()).offset(skip).limit(limit).all()
+    return (
+        db.query(ReservaFolio)
+        .options(joinedload(ReservaFolio.huesped), joinedload(ReservaFolio.habitaciones))
+        .order_by(ReservaFolio.id_reserva.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 def actualizar_estado_reserva(db: Session, reserva_id: int, nuevo_estado: str):
     reserva = db.query(ReservaFolio).filter(ReservaFolio.id_reserva == reserva_id).first()
