@@ -83,7 +83,7 @@ class PanelPrincipal(ctk.CTk):
             self.tabview.add("Punto de Venta")
             self.crear_placeholder(self.tabview.tab("Punto de Venta"), "Módulo de Punto de Venta (Restaurante y Room Service)\n\n(En desarrollo - Sprint 6)")
         self.tabview.add("Mantenimiento")
-        self.crear_placeholder(self.tabview.tab("Mantenimiento"), "Módulo de Gestión de Tickets de Mantenimiento\n\n(En desarrollo - Sprint 5)")
+        self.construir_pestana_mantenimiento()
         if self.id_rol in (1, 2):
             self.tabview.add("Reportes")
             self.crear_placeholder(self.tabview.tab("Reportes"), "Módulo de Reportes Operativos y Corte de Caja\n\n(En desarrollo - Sprint 7)")
@@ -424,6 +424,8 @@ class PanelPrincipal(ctk.CTk):
                     self.crear_tarjeta_habitacion(hab)
                 if hasattr(self, "actualizar_combo_habitaciones_reserva"):
                     self.actualizar_combo_habitaciones_reserva(lista_habs)
+                if hasattr(self, "actualizar_combo_habitaciones_mantenimiento"):
+                    self.actualizar_combo_habitaciones_mantenimiento(lista_habs)
         except requests.exceptions.ConnectionError:
             pass
 
@@ -2116,3 +2118,372 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("No se pudo timbrar la factura", detalle)
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    # =========================================================================
+    # MÓDULO 5 (SPRINT 5): GESTIÓN DE TICKETS DE MANTENIMIENTO Y REPARACIONES
+    # =========================================================================
+    def construir_pestana_mantenimiento(self):
+        tab_mant = self.tabview.tab("Mantenimiento")
+
+        # Panel Izquierdo: Formulario para levantar ticket de falla
+        frame_izq_m = ctk.CTkFrame(tab_mant, width=350)
+        frame_izq_m.pack(side="left", fill="y", padx=(10, 5), pady=10)
+        frame_izq_m.pack_propagate(False)
+
+        ctk.CTkLabel(
+            frame_izq_m,
+            text="Reportar Falla / Nuevo Ticket",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=(16, 6))
+
+        ctk.CTkLabel(
+            frame_izq_m,
+            text="Seleccione la habitación averiada:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray75"
+        ).pack(pady=(4, 2))
+
+        self.combo_mant_hab = ctk.CTkOptionMenu(
+            frame_izq_m,
+            width=300,
+            values=["Seleccione una habitación..."],
+            command=self.al_seleccionar_combo_hab_mantenimiento
+        )
+        self.combo_mant_hab.set("Seleccione una habitación...")
+        self.combo_mant_hab.pack(pady=4)
+
+        self.entry_mant_hab_id = ctk.CTkEntry(
+            frame_izq_m,
+            width=300,
+            placeholder_text="ID Habitación (Automático)"
+        )
+        self.entry_mant_hab_id.pack(pady=4)
+        self.entry_mant_hab_id.configure(state="readonly")
+
+        ctk.CTkLabel(
+            frame_izq_m,
+            text="Catálogo rápido de fallas comunes (opcional):",
+            font=ctk.CTkFont(size=12),
+            text_color="gray75"
+        ).pack(pady=(8, 2))
+
+        self.combo_falla_rapida = ctk.CTkOptionMenu(
+            frame_izq_m,
+            width=300,
+            values=[
+                "Seleccione falla común (opcional)...",
+                "Fuga de agua en baño / lavabo",
+                "Aire acondicionado / calefacción no enfría",
+                "Falla en cerradura electrónica de puerta",
+                "Falla eléctrica o luminaria fundida",
+                "Televisión o control remoto sin señal",
+                "Mobiliario, cristal o persiana dañada",
+            ],
+            command=self.al_seleccionar_falla_rapida
+        )
+        self.combo_falla_rapida.set("Seleccione falla común (opcional)...")
+        self.combo_falla_rapida.pack(pady=4)
+
+        ctk.CTkLabel(
+            frame_izq_m,
+            text="Descripción detallada de la falla:",
+            font=ctk.CTkFont(size=12),
+            text_color="gray75"
+        ).pack(pady=(8, 2))
+
+        self.entry_mant_desc = ctk.CTkEntry(
+            frame_izq_m,
+            width=300,
+            placeholder_text="Ej. Fuga de agua debajo del lavabo..."
+        )
+        self.entry_mant_desc.pack(pady=4)
+
+        ctk.CTkLabel(
+            frame_izq_m,
+            text="Al levantar el ticket, la habitación pasará\nautomáticamente a estado 'Mantenimiento'\npara bloquear su asignación a huéspedes.",
+            font=ctk.CTkFont(size=11),
+            text_color="#FFB74D",
+            justify="center"
+        ).pack(pady=(10, 8))
+
+        frame_btns_m = ctk.CTkFrame(frame_izq_m, fg_color="transparent")
+        frame_btns_m.pack(pady=8)
+
+        ctk.CTkButton(
+            frame_btns_m,
+            text="Levantar Ticket",
+            width=165,
+            fg_color="#E65100",
+            hover_color="#BF360C",
+            command=self.crear_ticket_mantenimiento_gui
+        ).pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            frame_btns_m,
+            text="Limpiar",
+            width=95,
+            fg_color="gray40",
+            hover_color="gray30",
+            command=self.limpiar_form_mantenimiento
+        ).pack(side="left", padx=4)
+
+        # Panel Derecho: Bitácora e Historial de Reparaciones
+        frame_der_m = ctk.CTkFrame(tab_mant)
+        frame_der_m.pack(side="right", fill="both", expand=True, padx=(5, 10), pady=10)
+
+        frame_top_m = ctk.CTkFrame(frame_der_m, fg_color="transparent")
+        frame_top_m.pack(fill="x", padx=12, pady=(10, 4))
+
+        ctk.CTkLabel(
+            frame_top_m,
+            text="Bitácora e Historial de Reparaciones",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(side="left")
+
+        self.lbl_resumen_tickets = ctk.CTkLabel(
+            frame_top_m,
+            text="Activos: 0  |  Resueltos: 0",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#64B5F6"
+        )
+        self.lbl_resumen_tickets.pack(side="right", padx=8)
+
+        frame_filtros_m = ctk.CTkFrame(frame_der_m, fg_color="transparent")
+        frame_filtros_m.pack(fill="x", padx=12, pady=4)
+
+        self.combo_filtro_tickets = ctk.CTkOptionMenu(
+            frame_filtros_m,
+            width=190,
+            values=["Todos los tickets", "Activos (Pendiente / En Reparación)", "Resueltos"],
+            command=lambda _v: self.cargar_tickets_mantenimiento()
+        )
+        self.combo_filtro_tickets.set("Todos los tickets")
+        self.combo_filtro_tickets.pack(side="left", padx=(0, 6))
+
+        self.entry_buscar_ticket = ctk.CTkEntry(
+            frame_filtros_m,
+            placeholder_text="Buscar por habitación o falla...",
+            height=28
+        )
+        self.entry_buscar_ticket.pack(side="left", fill="x", expand=True, padx=4)
+        self.entry_buscar_ticket.bind("<KeyRelease>", lambda _e: self.cargar_tickets_mantenimiento())
+
+        ctk.CTkButton(
+            frame_filtros_m,
+            text="Refrescar",
+            width=95,
+            height=28,
+            command=self.cargar_tickets_mantenimiento
+        ).pack(side="right", padx=(4, 0))
+
+        self.frame_lista_tickets = ctk.CTkScrollableFrame(frame_der_m)
+        self.frame_lista_tickets.pack(fill="both", expand=True, padx=10, pady=(4, 10))
+
+        self.actualizar_combo_habitaciones_mantenimiento()
+        self.cargar_tickets_mantenimiento()
+
+    def actualizar_combo_habitaciones_mantenimiento(self, lista_habs=None):
+        if not hasattr(self, "combo_mant_hab"):
+            return
+        try:
+            if lista_habs is None:
+                resp = requests.get(f"{self.url_base}/habitaciones/", headers=self.headers)
+                if resp.status_code == 200:
+                    lista_habs = resp.json()
+                else:
+                    return
+            opciones = ["Seleccione una habitación..."] + [
+                f"ID {h['id_habitacion']} - Hab. {h['numero_habitacion']} ({h['tipo']} [{h['estado']}])"
+                for h in lista_habs
+            ]
+            self.combo_mant_hab.configure(values=opciones)
+        except requests.exceptions.ConnectionError:
+            pass
+
+    def al_seleccionar_combo_hab_mantenimiento(self, opcion: str):
+        if opcion.startswith("ID "):
+            try:
+                id_hab = opcion.split(" - ")[0].replace("ID ", "").strip()
+                self._set_entry_readonly(self.entry_mant_hab_id, id_hab, "ID Habitación (Automático)")
+            except Exception:
+                pass
+        else:
+            self._set_entry_readonly(self.entry_mant_hab_id, "", "ID Habitación (Automático)")
+
+    def al_seleccionar_falla_rapida(self, opcion: str):
+        if not opcion.startswith("Seleccione "):
+            self.entry_mant_desc.delete(0, "end")
+            self.entry_mant_desc.insert(0, opcion)
+
+    def limpiar_form_mantenimiento(self):
+        self.combo_mant_hab.set("Seleccione una habitación...")
+        self._set_entry_readonly(self.entry_mant_hab_id, "", "ID Habitación (Automático)")
+        self.combo_falla_rapida.set("Seleccione falla común (opcional)...")
+        self.entry_mant_desc.delete(0, "end")
+
+    def crear_ticket_mantenimiento_gui(self):
+        id_hab_txt = self.entry_mant_hab_id.get().strip()
+        if not id_hab_txt:
+            messagebox.showwarning("Habitación requerida", "Selecciona una habitación del menú desplegable.")
+            return
+        desc = self.entry_mant_desc.get().strip()
+        if not desc:
+            messagebox.showwarning("Descripción requerida", "Ingresa o selecciona la descripción de la falla.")
+            return
+        try:
+            datos = {
+                "id_habitacion": int(id_hab_txt),
+                "descripcion_falla": desc,
+            }
+            resp = requests.post(f"{self.url_base}/mantenimiento/", json=datos, headers=self.headers)
+            if resp.status_code in (200, 201):
+                t_json = resp.json()
+                messagebox.showinfo(
+                    "Ticket Levantado",
+                    f"Ticket #{t_json.get('id_ticket')} registrado correctamente.\n"
+                    f"La Habitación {t_json.get('numero_habitacion')} ha sido puesta en estado 'Mantenimiento'."
+                )
+                self.limpiar_form_mantenimiento()
+                self.cargar_habitaciones()
+                self.cargar_tickets_mantenimiento()
+            else:
+                detalle = self._extraer_detalle_error(resp)
+                messagebox.showerror("No se pudo levantar el ticket", detalle)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def cambiar_estado_ticket_gui(self, id_ticket: int, nuevo_estado: str, num_hab: str):
+        try:
+            resp = requests.patch(
+                f"{self.url_base}/mantenimiento/{id_ticket}/estado",
+                json={"estado_ticket": nuevo_estado},
+                headers=self.headers
+            )
+            if resp.status_code == 200:
+                if nuevo_estado == "Resuelto":
+                    messagebox.showinfo(
+                        "Reparación Concluida",
+                        f"El Ticket #{id_ticket} (Hab. {num_hab}) fue marcado como 'Resuelto'.\n"
+                        f"La habitación pasó a estado 'Sucia' para su limpieza."
+                    )
+                self.cargar_habitaciones()
+                self.cargar_tickets_mantenimiento()
+            else:
+                detalle = self._extraer_detalle_error(resp)
+                messagebox.showerror("No se pudo actualizar el ticket", detalle)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def cargar_tickets_mantenimiento(self):
+        if not hasattr(self, "frame_lista_tickets"):
+            return
+        for w in self.frame_lista_tickets.winfo_children():
+            w.destroy()
+
+        filtro_estado = self.combo_filtro_tickets.get() if hasattr(self, "combo_filtro_tickets") else "Todos los tickets"
+        texto_busq = self.entry_buscar_ticket.get().strip().lower() if hasattr(self, "entry_buscar_ticket") else ""
+
+        colores_ticket = {
+            "Pendiente": "#FFA726",
+            "En Reparación": "#29B6F6",
+            "Resuelto": "#66BB6A",
+        }
+
+        try:
+            resp = requests.get(f"{self.url_base}/mantenimiento/", headers=self.headers)
+            if resp.status_code == 200:
+                tickets = resp.json()
+                activos_cnt = sum(1 for t in tickets if t.get("estado_ticket") != "Resuelto")
+                resueltos_cnt = sum(1 for t in tickets if t.get("estado_ticket") == "Resuelto")
+                if hasattr(self, "lbl_resumen_tickets"):
+                    self.lbl_resumen_tickets.configure(
+                        text=f"Activos: {activos_cnt}  |  Resueltos: {resueltos_cnt}"
+                    )
+
+                mostrados = 0
+                for t in tickets:
+                    est = t.get("estado_ticket", "Pendiente")
+                    if filtro_estado == "Activos (Pendiente / En Reparación)" and est == "Resuelto":
+                        continue
+                    if filtro_estado == "Resueltos" and est != "Resuelto":
+                        continue
+
+                    num_hab = str(t.get("numero_habitacion") or t.get("id_habitacion") or "S/N")
+                    desc = t.get("descripcion_falla") or ""
+                    reporta = t.get("nombre_usuario_reporta") or "Personal"
+
+                    if texto_busq and texto_busq not in num_hab.lower() and texto_busq not in desc.lower():
+                        continue
+
+                    mostrados += 1
+                    card = ctk.CTkFrame(self.frame_lista_tickets)
+                    card.pack(fill="x", padx=4, pady=4)
+
+                    frame_info = ctk.CTkFrame(card, fg_color="transparent")
+                    frame_info.pack(side="left", fill="x", expand=True, padx=8, pady=6)
+
+                    color_est = colores_ticket.get(est, "white")
+                    ctk.CTkLabel(
+                        frame_info,
+                        text=f"Ticket #{t['id_ticket']}  |  Habitación {num_hab}  |  [{est}]",
+                        font=ctk.CTkFont(size=13, weight="bold"),
+                        text_color=color_est,
+                        anchor="w"
+                    ).pack(fill="x")
+
+                    ctk.CTkLabel(
+                        frame_info,
+                        text=f"Falla: {desc}",
+                        font=ctk.CTkFont(size=12),
+                        text_color="white",
+                        anchor="w"
+                    ).pack(fill="x", pady=(1, 1))
+
+                    f_crea = (t.get("fecha_creacion") or "")[:19].replace("T", " ")
+                    f_res = (t.get("fecha_resolucion") or "")[:19].replace("T", " ")
+                    meta_txt = f"Reportó: {reporta}  |  Creado: {f_crea}"
+                    if f_res:
+                        meta_txt += f"  |  Resuelto: {f_res}"
+
+                    ctk.CTkLabel(
+                        frame_info,
+                        text=meta_txt,
+                        font=ctk.CTkFont(size=10),
+                        text_color="gray65",
+                        anchor="w"
+                    ).pack(fill="x")
+
+                    frame_acc = ctk.CTkFrame(card, fg_color="transparent")
+                    frame_acc.pack(side="right", padx=6, pady=6)
+
+                    if est != "Resuelto":
+                        ctk.CTkButton(
+                            frame_acc,
+                            text="Marcar Resuelto",
+                            width=115,
+                            height=26,
+                            fg_color="#2E7D32",
+                            hover_color="#1b5e20",
+                            command=lambda tid=t["id_ticket"], nh=num_hab: self.cambiar_estado_ticket_gui(tid, "Resuelto", nh)
+                        ).pack(side="right", padx=3)
+
+                    if est == "Pendiente":
+                        ctk.CTkButton(
+                            frame_acc,
+                            text="En Reparación",
+                            width=105,
+                            height=26,
+                            fg_color="#0277BD",
+                            hover_color="#01579B",
+                            command=lambda tid=t["id_ticket"], nh=num_hab: self.cambiar_estado_ticket_gui(tid, "En Reparación", nh)
+                        ).pack(side="right", padx=3)
+
+                if mostrados == 0:
+                    ctk.CTkLabel(
+                        self.frame_lista_tickets,
+                        text="No hay tickets de mantenimiento para el filtro seleccionado.",
+                        text_color="gray60",
+                        font=ctk.CTkFont(size=12)
+                    ).pack(pady=20)
+        except requests.exceptions.ConnectionError:
+            pass
