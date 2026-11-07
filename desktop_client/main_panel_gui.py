@@ -1870,7 +1870,7 @@ class PanelPrincipal(ctk.CTk):
             rightMargin=40,
             leftMargin=40,
             topMargin=36,
-            bottomMargin=36,
+            bottomMargin=95,
         )
         estilos = getSampleStyleSheet()
         estilo_normal = estilos["Normal"]
@@ -2037,23 +2037,36 @@ class PanelPrincipal(ctk.CTk):
         tabla_pie_totales = Table([[info_pago_p, tabla_totales]], colWidths=[4.4 * inch, 2.8 * inch])
         tabla_pie_totales.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
         elementos.append(tabla_pie_totales)
-        elementos.append(Spacer(1, 20))
 
-        # 5. Sello Digital PAC / SAT Simulado
+        # 5. Pie de página fijo al final de la hoja (Cadena Original del SAT y leyenda CFDI)
         sello_simulado = (
             f"||1.1|{uuid_str}|{fac.get('fecha_timbrado', '')}|HKF260101AAA|"
             f"{fac.get('rfc_receptor', '')}|{total:.2f}|SelloDigitalPACKeyFlow="
             f"{uuid_str.replace('-', '')}89AF01BC||"
         )
-        elementos.append(
-            Paragraph(
-                f"<b>Cadena Original del Complemento de Certificación Digital del SAT:</b><br/>{sello_simulado}<br/><br/>"
-                "Este documento es una representación impresa de un CFDI emitida por el Sistema de Gestión Hotelera KeyFlow.",
-                estilo_peq,
-            )
+        parrafo_pie = Paragraph(
+            f"<b>Cadena Original del Complemento de Certificación Digital del SAT:</b><br/>{sello_simulado}<br/><br/>"
+            "Este documento es una representación impresa de un CFDI emitida por el Sistema de Gestión Hotelera KeyFlow.",
+            estilo_peq,
         )
 
-        doc.build(elementos)
+        def dibujar_pie_pagina(canvas, doc_obj):
+            canvas.saveState()
+            ancho_util = letter[0] - doc_obj.leftMargin - doc_obj.rightMargin
+            _, alto_p = parrafo_pie.wrap(ancho_util, doc_obj.bottomMargin)
+            y_base = 28
+            canvas.setStrokeColor(colors.HexColor("#CBD5E0"))
+            canvas.setLineWidth(0.6)
+            canvas.line(
+                doc_obj.leftMargin,
+                y_base + alto_p + 8,
+                letter[0] - doc_obj.rightMargin,
+                y_base + alto_p + 8,
+            )
+            parrafo_pie.drawOn(canvas, doc_obj.leftMargin, y_base)
+            canvas.restoreState()
+
+        doc.build(elementos, onFirstPage=dibujar_pie_pagina, onLaterPages=dibujar_pie_pagina)
         return ruta_pdf
 
     def timbrar_factura_gui(self):
