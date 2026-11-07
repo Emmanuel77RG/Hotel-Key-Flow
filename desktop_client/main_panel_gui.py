@@ -57,7 +57,7 @@ class PanelPrincipal(ctk.CTk):
         self.ruta_logo_light = os.path.join(ruta_assets, "logo_light.png")
         if os.path.exists(self.ruta_logo_dark):
             img_dark = Image.open(self.ruta_logo_dark)
-            img_light = Image.open(ruta_light) if os.path.exists(self.ruta_logo_light) else img_dark
+            img_light = Image.open(self.ruta_logo_light) if os.path.exists(self.ruta_logo_light) else img_dark
             self.logo_header_ctk = ctk.CTkImage(light_image=img_light, dark_image=img_dark, size=(168, 66))
             self.label_titulo = ctk.CTkLabel(self.header_frame, text="", image=self.logo_header_ctk)
         else:
