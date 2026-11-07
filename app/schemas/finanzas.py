@@ -1,5 +1,7 @@
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, field_validator
 from datetime import datetime
+from typing import Optional
 
 class CargoBase(BaseModel):
     monto: float
@@ -20,7 +22,7 @@ class PagoBase(BaseModel):
     monto: float
     metodo_pago: str
     id_reserva: int
-    id_usuario: int
+    id_usuario: Optional[int] = None
 
 class PagoCrear(PagoBase):
     pass
@@ -31,3 +33,21 @@ class PagoRespuesta(PagoBase):
 
     class Config:
         from_attributes = True
+
+class FacturaSolicitar(BaseModel):
+    id_reserva: int
+    rfc_cliente: str
+    razon_social: Optional[str] = "PÚBLICO EN GENERAL"
+
+    @field_validator("rfc_cliente")
+    @classmethod
+    def validar_formato_rfc(cls, v: str) -> str:
+        # Criterio de Aceptación BDD RF-FAC-005 (Sección 10.2 y 19.2):
+        # Rechazar caracteres especiales inválidos (ej. guiones "XAXX-010101-000") con HTTP 422
+        rfc_limpio = v.strip().upper()
+        patron_rfc = r"^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$"
+        if not re.match(patron_rfc, rfc_limpio):
+            raise ValueError(
+                "Formato de RFC inválido. Debe contener 12 o 13 caracteres alfanuméricos sin guiones ni espacios (ej. XAXX010101000)."
+            )
+        return rfc_limpio

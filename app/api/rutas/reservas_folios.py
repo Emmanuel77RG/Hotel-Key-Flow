@@ -48,10 +48,30 @@ def obtener_detalle_reserva(
         "estado_folio": reserva.estado_folio,
         "id_usuario": reserva.id_usuario,
         "id_huesped": reserva.id_huesped,
+        "nombre_huesped": reserva.nombre_huesped,
+        "numeros_habitaciones": reserva.numeros_habitaciones,
         "habitaciones": habitaciones_info,
         "total_cargos": resumen_folio["total_cargos"],
         "total_pagos": resumen_folio["total_pagos"],
         "saldo_pendiente": resumen_folio["saldo_pendiente"],
+        "cargos": [
+            {
+                "id_cargo": c.id_cargo,
+                "descripcion": c.descripcion,
+                "monto": float(c.monto),
+                "fecha_creacion": c.fecha_creacion.strftime("%Y-%m-%d %H:%M") if c.fecha_creacion else "",
+            }
+            for c in resumen_folio["cargos"]
+        ],
+        "pagos": [
+            {
+                "id_pago": p.id_pago,
+                "metodo_pago": p.metodo_pago,
+                "monto": float(p.monto),
+                "fecha_creacion": p.fecha_creacion.strftime("%Y-%m-%d %H:%M") if p.fecha_creacion else "",
+            }
+            for p in resumen_folio["pagos"]
+        ],
     }
 
 @router.post("/", response_model=ReservaRespuesta, status_code=status.HTTP_201_CREATED, summary="Crear una reserva")
