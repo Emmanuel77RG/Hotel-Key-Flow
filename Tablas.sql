@@ -5,6 +5,7 @@ CREATE TABLE huespedes (
     nombre_completo VARCHAR(150) NOT NULL,
     email VARCHAR(100),
     telefono VARCHAR(20),
+    rfc VARCHAR(20),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -62,7 +63,7 @@ CREATE TABLE cargos (
 CREATE TABLE pagos (
     id_pago SERIAL PRIMARY KEY,
     monto DECIMAL(10,2) NOT NULL,
-    metodo_pago VARCHAR(50) NOT NULL, -- ej: Tarjeta, Efectivo, Transferencia
+    metodo_pago VARCHAR(100) NOT NULL, -- ej: Tarjeta, Efectivo, Transferencia
     id_reserva INTEGER REFERENCES reservas_folios(id_reserva) ON DELETE CASCADE,
     id_usuario INTEGER REFERENCES usuarios(id_usuario), -- Quien cobró
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -16,7 +16,7 @@ class Pago(Base):
 
     id_pago = Column(Integer, primary_key=True, index=True, autoincrement=True)
     monto = Column(Float, nullable=False)
-    metodo_pago = Column(String(50), nullable=False)
+    metodo_pago = Column(String(100), nullable=False)
     id_reserva = Column(Integer, ForeignKey("reservas_folios.id_reserva", ondelete="CASCADE"), nullable=False)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)

@@ -25,6 +25,7 @@ Base.metadata.create_all(bind=engine)
 try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE huespedes ADD COLUMN IF NOT EXISTS rfc VARCHAR(20);"))
+        conn.execute(text("ALTER TABLE pagos ALTER COLUMN metodo_pago TYPE VARCHAR(100);"))
 except Exception:
     pass
 

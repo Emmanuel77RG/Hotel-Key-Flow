@@ -1472,6 +1472,15 @@ class PanelPrincipal(ctk.CTk):
         for w in self.frame_movimientos_folio.winfo_children():
             w.destroy()
 
+    def _extraer_detalle_error(self, resp) -> str:
+        try:
+            data = resp.json()
+            if isinstance(data, dict):
+                return str(data.get("detail", resp.text))
+            return str(data)
+        except Exception:
+            return resp.text or f"Error HTTP {resp.status_code}"
+
     def consultar_folio(self):
         try:
             reserva_id = self.entry_folio_reserva_id.get().strip()
@@ -1488,6 +1497,13 @@ class PanelPrincipal(ctk.CTk):
                 total_pagos = float(data.get("total_pagos", 0.0))
                 saldo = float(data.get("saldo_pendiente", 0.0))
                 self.saldo_folio_actual = saldo
+
+                if hasattr(self, "combo_folio_reserva"):
+                    prefijo = f"Reserva #{data.get('id_reserva')} |"
+                    for op in self.combo_folio_reserva.cget("values"):
+                        if op.startswith(prefijo):
+                            self.combo_folio_reserva.set(op)
+                            break
 
                 if hasattr(self, "entry_fac_rfc"):
                     self.entry_fac_rfc.delete(0, "end")
@@ -1593,7 +1609,7 @@ class PanelPrincipal(ctk.CTk):
                 self.limpiar_form_cargo()
                 self.consultar_folio()
             else:
-                detalle = resp.json().get("detail", resp.text)
+                detalle = self._extraer_detalle_error(resp)
                 messagebox.showerror("No se pudo agregar el cargo", detalle)
         except ValueError:
             messagebox.showerror("Monto inválido", "El monto debe ser un número válido (ej. 250.00).")
@@ -1630,7 +1646,7 @@ class PanelPrincipal(ctk.CTk):
                 self.consultar_folio()
                 return True
             else:
-                detalle = resp.json().get("detail", resp.text)
+                detalle = self._extraer_detalle_error(resp)
                 messagebox.showerror("No se pudo registrar el pago", detalle)
                 return False
         except Exception as e:
@@ -1729,7 +1745,7 @@ class PanelPrincipal(ctk.CTk):
                 )
                 return
             token_corto = uuid.uuid4().hex[:8].upper()
-            metodo_token = f"Tarjeta Chip ****7390 (Token: tok_chip_{token_corto})"
+            metodo_token = f"Tarjeta Chip ****7390 (Tok: {token_corto})"
             lbl_estado_lcd.configure(
                 text=f"✅ APROBADA CON NIP\nToken: tok_chip_{token_corto}",
                 text_color="#00E676"
@@ -1749,7 +1765,7 @@ class PanelPrincipal(ctk.CTk):
 
         def pago_contactless():
             token_corto = uuid.uuid4().hex[:8].upper()
-            metodo_token = f"Tarjeta Contactless ****4821 (Token: tok_nfc_{token_corto})"
+            metodo_token = f"Tarjeta NFC ****4821 (Tok: {token_corto})"
             lbl_estado_lcd.configure(
                 text=f"✅ APROBADA SIN CONTACTO (NFC)\nToken: tok_nfc_{token_corto}",
                 text_color="#00E676"
