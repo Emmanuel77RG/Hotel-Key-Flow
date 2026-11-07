@@ -42,8 +42,11 @@ CREATE TABLE reservas_habitaciones (
 -- 5. Tabla de Mantenimiento
 CREATE TABLE tickets_mantenimiento (
     id_ticket SERIAL PRIMARY KEY,
+    categoria VARCHAR(50) DEFAULT 'General',
+    prioridad VARCHAR(30) DEFAULT 'Media',
     descripcion_falla VARCHAR(255) NOT NULL,
-    estado_ticket VARCHAR(50) NOT NULL, -- ej: Pendiente, Resuelto
+    estado_ticket VARCHAR(50) NOT NULL, -- ej: Pendiente, En Reparación, Resuelto
+    nota_resolucion VARCHAR(255),
     id_habitacion INTEGER REFERENCES habitaciones(id_habitacion),
     id_usuario_reporta INTEGER REFERENCES usuarios(id_usuario),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
