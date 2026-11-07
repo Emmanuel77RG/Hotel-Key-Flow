@@ -22,7 +22,6 @@ from reportlab.platypus import (
 class PanelPrincipal(ctk.CTk):
     def __init__(self, token, id_rol):
         super().__init__()
-        self.withdraw()
         self.title("Hotel KeyFlow")
         
         self.token = token
@@ -95,8 +94,6 @@ class PanelPrincipal(ctk.CTk):
 
         # Construir únicamente la pestaña activa inicial para un arranque instantáneo
         self._asegurar_pestana(self.tabview.get())
-        self.update_idletasks()
-        self.deiconify()
 
     def _al_cambiar_pestana(self):
         self._asegurar_pestana(self.tabview.get())
@@ -128,7 +125,6 @@ class PanelPrincipal(ctk.CTk):
 
     def _crear_modal(self, titulo: str, geometria: str, resizable: bool = False):
         modal = ctk.CTkToplevel(self)
-        modal.withdraw()
         modal.title(titulo)
         modal.geometry(geometria)
         modal.resizable(resizable, resizable)
@@ -136,10 +132,7 @@ class PanelPrincipal(ctk.CTk):
         return modal
 
     def _mostrar_modal(self, modal):
-        modal.update_idletasks()
-        modal.deiconify()
-        modal.grab_set()
-        modal.focus_force()
+        modal.after(20, lambda: (modal.lift(), modal.focus_force(), modal.grab_set()))
 
     def construir_pestana_habitaciones(self):
         # --- MÓDULO DE HABITACIONES (BARRA SUPERIOR + GRID) ---

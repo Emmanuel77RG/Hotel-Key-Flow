@@ -12,7 +12,6 @@ ctk.set_default_color_theme("blue")
 class VentanaLogin(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.withdraw()
         self.http = requests.Session()
         
         self.title("Hotel KeyFlow - Acceso")
@@ -45,9 +44,6 @@ class VentanaLogin(ctk.CTk):
         # Botón Iniciar Sesión
         self.btn_login = ctk.CTkButton(self, text="Iniciar Sesión", width=280, height=40, font=ctk.CTkFont(weight="bold"), command=self.procesar_login)
         self.btn_login.pack(pady=20)
-
-        self.update_idletasks()
-        self.deiconify()
         
     def procesar_login(self, *_args):
         email = self.entry_email.get()
