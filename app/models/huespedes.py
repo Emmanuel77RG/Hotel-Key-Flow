@@ -10,4 +10,5 @@ class Huesped(Base):
     nombre_completo = Column(String(150), nullable=False)
     email = Column(String(100), nullable=True)
     telefono = Column(String(20), nullable=True)
+    rfc = Column(String(20), nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)

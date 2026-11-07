@@ -49,6 +49,7 @@ def obtener_detalle_reserva(
         "id_usuario": reserva.id_usuario,
         "id_huesped": reserva.id_huesped,
         "nombre_huesped": reserva.nombre_huesped,
+        "rfc_huesped": reserva.huesped.rfc if reserva.huesped else None,
         "numeros_habitaciones": reserva.numeros_habitaciones,
         "habitaciones": habitaciones_info,
         "total_cargos": resumen_folio["total_cargos"],
@@ -145,7 +146,7 @@ def realizar_checkin(
             estado_txt = hab.estado.value if hasattr(hab.estado, "value") else str(hab.estado)
             raise HTTPException(
                 status_code=400,
-                detail=f"Bloqueo operativo (RF-HAB-004): La habitación {hab.numero_habitacion} no está Limpia (estado actual: {estado_txt})."
+                detail=f"Bloqueo operativo: La habitación {hab.numero_habitacion} no está Limpia (estado actual: {estado_txt})."
             )
 
     # Calculamos noches de estadía y generamos el Cargo Automático de Hospedaje (RF-FAC-001 y RF-FAC-002)

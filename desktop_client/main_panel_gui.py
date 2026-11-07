@@ -1,5 +1,6 @@
 import calendar
 from datetime import date, datetime, timedelta
+import uuid
 import customtkinter as ctk
 import requests
 from tkinter import messagebox
@@ -129,7 +130,7 @@ class PanelPrincipal(ctk.CTk):
         frame_header_der.pack(fill="x", padx=12, pady=(12, 5))
         ctk.CTkLabel(
             frame_header_der,
-            text="Personal Registrado (RF-ADM-003)",
+            text="Personal Registrado",
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(side="left")
         ctk.CTkButton(
@@ -534,9 +535,11 @@ class PanelPrincipal(ctk.CTk):
         self.entry_h_email.pack(pady=3)
         self.entry_h_tel = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Teléfono")
         self.entry_h_tel.pack(pady=3)
+        self.entry_h_rfc = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="RFC (Opcional - Ej. XAXX010101000)")
+        self.entry_h_rfc.pack(pady=3)
 
         frame_btns_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
-        frame_btns_h.pack(pady=8)
+        frame_btns_h.pack(pady=6)
         ctk.CTkButton(frame_btns_h, text="Registrar Huésped", width=155, command=self.crear_huesped).pack(side="left", padx=4)
         ctk.CTkButton(frame_btns_h, text="Limpiar", width=85, fg_color="gray40", hover_color="gray30", command=self.limpiar_formulario_huesped).pack(side="left", padx=4)
 
@@ -549,7 +552,7 @@ class PanelPrincipal(ctk.CTk):
         frame_busqueda_h.pack(fill="x", padx=10, pady=2)
         self.entry_buscar_huesped = ctk.CTkEntry(
             frame_busqueda_h,
-            placeholder_text="Buscar por nombre o documento...",
+            placeholder_text="Buscar por nombre, documento o RFC...",
             height=26
         )
         self.entry_buscar_huesped.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -760,13 +763,13 @@ class PanelPrincipal(ctk.CTk):
         frame_der_f = ctk.CTkFrame(tab_fol)
         frame_der_f.pack(side="right", fill="both", expand=True, padx=(5, 10), pady=10)
 
-        # --- Sub-sección 1: Cargos Manuales / Extras (RF-FAC-003) ---
+        # --- Sub-sección 1: Cargos Manuales / Extras ---
         frame_sec_cargo = ctk.CTkFrame(frame_der_f)
         frame_sec_cargo.pack(fill="x", padx=10, pady=(8, 4))
 
         ctk.CTkLabel(
             frame_sec_cargo,
-            text="1. Agregar Cargo Manual / Extra (RF-FAC-003)",
+            text="1. Agregar Cargo Manual / Extra",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(6, 3))
 
@@ -812,13 +815,13 @@ class PanelPrincipal(ctk.CTk):
             command=self.limpiar_form_cargo
         ).pack(side="left", padx=4)
 
-        # --- Sub-sección 2: Registro de Pagos (RF-FAC-004 y RNF-SEG-003) ---
+        # --- Sub-sección 2: Registro de Pagos ---
         frame_sec_pago = ctk.CTkFrame(frame_der_f)
         frame_sec_pago.pack(fill="x", padx=10, pady=4)
 
         ctk.CTkLabel(
             frame_sec_pago,
-            text="2. Registrar Pago a Cuenta Folio (RF-FAC-004)",
+            text="2. Registrar Pago a Cuenta Folio",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(6, 3))
 
@@ -828,7 +831,7 @@ class PanelPrincipal(ctk.CTk):
             values=[
                 "Selecciona una opción",
                 "Efectivo",
-                "Tarjeta de Crédito / Débito (Token Pasarela)",
+                "Tarjeta (Terminal PinPad)",
             ]
         )
         self.combo_metodo_pago.set("Selecciona una opción")
@@ -866,13 +869,13 @@ class PanelPrincipal(ctk.CTk):
             command=self.limpiar_form_pago
         ).pack(side="left", padx=4)
 
-        # --- Sub-sección 3: Emisión de Factura Electrónica PAC (RF-FAC-005) ---
+        # --- Sub-sección 3: Emisión de Factura Electrónica ---
         frame_sec_fac = ctk.CTkFrame(frame_der_f)
         frame_sec_fac.pack(fill="x", padx=10, pady=(4, 8))
 
         ctk.CTkLabel(
             frame_sec_fac,
-            text="3. Emisión de Factura Electrónica PAC (RF-FAC-005)",
+            text="3. Emisión de Factura Electrónica",
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(pady=(6, 3))
 
@@ -910,11 +913,13 @@ class PanelPrincipal(ctk.CTk):
                 return
             doc_sel = self.combo_h_doc.get()
             doc_valor = "Sin especificar" if doc_sel == "Selecciona una opción" else doc_sel
+            rfc_val = self.entry_h_rfc.get().strip() or None
             datos = {
                 "nombre_completo": nombre,
                 "documento_identidad": doc_valor,
                 "email": self.entry_h_email.get().strip(),
-                "telefono": self.entry_h_tel.get().strip()
+                "telefono": self.entry_h_tel.get().strip(),
+                "rfc": rfc_val
             }
             respuesta = requests.post(f"{self.url_base}/huespedes/", json=datos, headers=self.headers)
             if respuesta.status_code in [200, 201]:
@@ -922,6 +927,12 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showinfo("Éxito", f"Huésped registrado correctamente (ID: #{h_json.get('id_huesped')}).")
                 self.limpiar_formulario_huesped()
                 self.cargar_huespedes()
+            elif respuesta.status_code == 422:
+                errores = respuesta.json().get("detail", [])
+                msg = "El RFC ingresado no tiene un formato fiscal válido."
+                if isinstance(errores, list) and errores:
+                    msg = errores[0].get("msg", msg)
+                messagebox.showerror("RFC Inválido", msg)
             else:
                 messagebox.showerror("Error", f"No se pudo registrar: {respuesta.text}")
         except Exception as e:
@@ -932,6 +943,8 @@ class PanelPrincipal(ctk.CTk):
         self.combo_h_doc.set("Selecciona una opción")
         self.entry_h_email.delete(0, "end")
         self.entry_h_tel.delete(0, "end")
+        if hasattr(self, "entry_h_rfc"):
+            self.entry_h_rfc.delete(0, "end")
 
     def limpiar_busqueda_huesped(self):
         if hasattr(self, "entry_buscar_huesped"):
@@ -985,16 +998,18 @@ class PanelPrincipal(ctk.CTk):
                     self.mapa_huespedes[h["id_huesped"]] = h.get("nombre_completo") or f"Huésped #{h['id_huesped']}"
                     nombre = (h.get("nombre_completo") or "").lower()
                     doc = (h.get("documento_identidad") or "").lower()
-                    if filtro and filtro not in nombre and filtro not in doc:
+                    rfc_h = (h.get("rfc") or "").lower()
+                    if filtro and filtro not in nombre and filtro not in doc and filtro not in rfc_h:
                         continue
 
                     fila = ctk.CTkFrame(self.frame_lista_huespedes)
                     fila.pack(fill="x", pady=2, padx=2)
 
                     doc_mostrar = h.get("documento_identidad") or "Sin especificar"
+                    rfc_sufijo = f" | RFC: {h['rfc']}" if h.get("rfc") else ""
                     ctk.CTkLabel(
                         fila,
-                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({doc_mostrar})",
+                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({doc_mostrar}{rfc_sufijo})",
                         font=ctk.CTkFont(size=12)
                     ).pack(side="left", padx=6, pady=4)
 
@@ -1053,7 +1068,7 @@ class PanelPrincipal(ctk.CTk):
     def abrir_modal_editar_huesped(self, huesped):
         modal = ctk.CTkToplevel(self)
         modal.title(f"Editar Huésped #{huesped['id_huesped']}")
-        modal.geometry("350x340")
+        modal.geometry("350x380")
         modal.grab_set()
 
         ctk.CTkLabel(modal, text=f"Editar Huésped #{huesped['id_huesped']}", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=12)
@@ -1078,6 +1093,10 @@ class PanelPrincipal(ctk.CTk):
         e_tel.insert(0, huesped.get("telefono", "") or "")
         e_tel.pack(pady=5)
 
+        e_rfc = ctk.CTkEntry(modal, width=250, placeholder_text="RFC (Opcional - Ej. XAXX010101000)")
+        e_rfc.insert(0, huesped.get("rfc", "") or "")
+        e_rfc.pack(pady=5)
+
         def guardar():
             doc_sel = combo_doc.get()
             doc_val = "Sin especificar" if doc_sel == "Selecciona una opción" else doc_sel
@@ -1086,6 +1105,7 @@ class PanelPrincipal(ctk.CTk):
                 "documento_identidad": doc_val,
                 "email": e_email.get().strip(),
                 "telefono": e_tel.get().strip(),
+                "rfc": e_rfc.get().strip() or None,
             }
             try:
                 r = requests.put(
@@ -1098,6 +1118,12 @@ class PanelPrincipal(ctk.CTk):
                     modal.destroy()
                     self.cargar_huespedes()
                     self.cargar_reservas()
+                elif r.status_code == 422:
+                    errores = r.json().get("detail", [])
+                    msg = "El RFC ingresado no tiene un formato fiscal válido."
+                    if isinstance(errores, list) and errores:
+                        msg = errores[0].get("msg", msg)
+                    messagebox.showerror("RFC Inválido", msg)
                 else:
                     messagebox.showerror("Error", f"No se pudo actualizar: {r.text}")
             except Exception as e:
@@ -1326,9 +1352,8 @@ class PanelPrincipal(ctk.CTk):
                 self.limpiar_formulario_reserva()
                 self.cargar_reservas()
             elif respuesta.status_code == 409:
-                # Criterio de Aceptación BDD RF-RES-003 (Prevención de Overbooking)
                 detalle = respuesta.json().get("detail", "Inventario no disponible para las fechas seleccionadas")
-                messagebox.showerror("Sin Disponibilidad (RF-RES-003)", detalle)
+                messagebox.showerror("Sin Disponibilidad", detalle)
             else:
                 messagebox.showerror("Error", f"Fallo al crear reserva: {respuesta.text}")
         except Exception as e:
@@ -1457,11 +1482,21 @@ class PanelPrincipal(ctk.CTk):
             if respuesta.status_code == 200:
                 data = respuesta.json()
                 nom_h = data.get("nombre_huesped") or f"Huésped #{data.get('id_huesped')}"
+                rfc_h = data.get("rfc_huesped") or ""
                 habs = data.get("numeros_habitaciones") or "Sin hab."
                 total_cargos = float(data.get("total_cargos", 0.0))
                 total_pagos = float(data.get("total_pagos", 0.0))
                 saldo = float(data.get("saldo_pendiente", 0.0))
                 self.saldo_folio_actual = saldo
+
+                if hasattr(self, "entry_fac_rfc"):
+                    self.entry_fac_rfc.delete(0, "end")
+                    if rfc_h:
+                        self.entry_fac_rfc.insert(0, rfc_h)
+                if hasattr(self, "entry_fac_razon"):
+                    self.entry_fac_razon.delete(0, "end")
+                    if data.get("nombre_huesped"):
+                        self.entry_fac_razon.insert(0, data.get("nombre_huesped"))
 
                 texto = (
                     f"Reserva #{data.get('id_reserva')}  |  Huésped: {nom_h}  |  Habitación: {habs}\n"
@@ -1576,6 +1611,32 @@ class PanelPrincipal(ctk.CTk):
         self.combo_metodo_pago.set("Selecciona una opción")
         self.entry_pago_monto.delete(0, "end")
 
+    def _ejecutar_post_pago(self, id_reserva: int, metodo_pago_str: str, monto: float) -> bool:
+        try:
+            datos = {
+                "id_reserva": id_reserva,
+                "metodo_pago": metodo_pago_str,
+                "monto": monto,
+            }
+            resp = requests.post(f"{self.url_base}/finanzas/pagos", json=datos, headers=self.headers)
+            if resp.status_code in (200, 201):
+                pago_json = resp.json()
+                messagebox.showinfo(
+                    "Pago Registrado",
+                    f"Pago por ${monto:.2f} registrado con éxito.\n"
+                    f"Método: {pago_json.get('metodo_pago')}"
+                )
+                self.limpiar_form_pago()
+                self.consultar_folio()
+                return True
+            else:
+                detalle = resp.json().get("detail", resp.text)
+                messagebox.showerror("No se pudo registrar el pago", detalle)
+                return False
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            return False
+
     def registrar_pago_folio(self):
         reserva_id = self.entry_folio_reserva_id.get().strip()
         if not reserva_id:
@@ -1591,28 +1652,165 @@ class PanelPrincipal(ctk.CTk):
             return
         try:
             monto = float(monto_txt)
-            datos = {
-                "id_reserva": int(reserva_id),
-                "metodo_pago": metodo,
-                "monto": monto,
-            }
-            resp = requests.post(f"{self.url_base}/finanzas/pagos", json=datos, headers=self.headers)
-            if resp.status_code in (200, 201):
-                pago_json = resp.json()
-                messagebox.showinfo(
-                    "Pago Registrado (RF-FAC-004)",
-                    f"Pago por ${monto:.2f} registrado con éxito.\n"
-                    f"Método: {pago_json.get('metodo_pago')}"
+            if monto <= 0:
+                messagebox.showwarning("Monto inválido", "El monto a pagar debe ser mayor a $0.00.")
+                return
+            if monto > round(getattr(self, "saldo_folio_actual", 0.0) + 0.01, 2):
+                messagebox.showwarning(
+                    "Monto excede saldo",
+                    f"El monto (${monto:.2f}) excede el saldo pendiente de la reserva (${self.saldo_folio_actual:.2f})."
                 )
-                self.limpiar_form_pago()
-                self.consultar_folio()
+                return
+            if metodo == "Tarjeta (Terminal PinPad)":
+                self.abrir_simulador_terminal_pinpad(int(reserva_id), monto)
             else:
-                detalle = resp.json().get("detail", resp.text)
-                messagebox.showerror("No se pudo registrar el pago", detalle)
+                self._ejecutar_post_pago(int(reserva_id), metodo, monto)
         except ValueError:
             messagebox.showerror("Monto inválido", "El monto debe ser un número válido.")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+
+    def abrir_simulador_terminal_pinpad(self, id_reserva: int, monto: float):
+        modal = ctk.CTkToplevel(self)
+        modal.title("Terminal Bancaria PinPad")
+        modal.geometry("390x430")
+        modal.resizable(False, False)
+        modal.grab_set()
+
+        ctk.CTkLabel(
+            modal,
+            text="Terminal Bancaria PinPad",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=(12, 4))
+
+        ctk.CTkLabel(
+            modal,
+            text="Entregue la terminal al huésped para autorizar el cargo",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70"
+        ).pack(pady=(0, 8))
+
+        # Pantalla LCD simulada de la terminal
+        frame_lcd = ctk.CTkFrame(modal, fg_color="#0D1B2A", corner_radius=10, border_width=2, border_color="#415A77")
+        frame_lcd.pack(fill="x", padx=22, pady=6)
+
+        ctk.CTkLabel(
+            frame_lcd,
+            text=f"TOTAL A COBRAR: ${monto:.2f} MXN",
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color="#00E676"
+        ).pack(pady=(10, 4))
+
+        lbl_estado_lcd = ctk.CTkLabel(
+            frame_lcd,
+            text="Acerque, inserte o deslice su tarjeta...",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#90CAF9",
+            wraplength=320
+        )
+        lbl_estado_lcd.pack(pady=(2, 10))
+
+        # Frame dinámico para el ingreso de NIP (oculto inicialmente)
+        frame_nip = ctk.CTkFrame(modal, fg_color="transparent")
+        entry_nip = ctk.CTkEntry(
+            frame_nip,
+            width=140,
+            placeholder_text="NIP (4 dígitos)",
+            show="*",
+            justify="center",
+            font=ctk.CTkFont(size=15, weight="bold")
+        )
+        entry_nip.pack(side="left", padx=6)
+
+        def confirmar_nip():
+            nip = entry_nip.get().strip()
+            if len(nip) != 4 or not nip.isdigit():
+                lbl_estado_lcd.configure(
+                    text="⚠️ NIP inválido: Ingrese exactamente 4 dígitos numéricos.",
+                    text_color="#FFB74D"
+                )
+                return
+            token_corto = uuid.uuid4().hex[:8].upper()
+            metodo_token = f"Tarjeta Chip ****7390 (Token: tok_chip_{token_corto})"
+            lbl_estado_lcd.configure(
+                text=f"✅ APROBADA CON NIP\nToken: tok_chip_{token_corto}",
+                text_color="#00E676"
+            )
+            modal.update_idletasks()
+            modal.destroy()
+            self._ejecutar_post_pago(id_reserva, metodo_token, monto)
+
+        ctk.CTkButton(
+            frame_nip,
+            text="Autorizar NIP",
+            width=120,
+            fg_color="#2E7D32",
+            hover_color="#1b5e20",
+            command=confirmar_nip
+        ).pack(side="left", padx=4)
+
+        def pago_contactless():
+            token_corto = uuid.uuid4().hex[:8].upper()
+            metodo_token = f"Tarjeta Contactless ****4821 (Token: tok_nfc_{token_corto})"
+            lbl_estado_lcd.configure(
+                text=f"✅ APROBADA SIN CONTACTO (NFC)\nToken: tok_nfc_{token_corto}",
+                text_color="#00E676"
+            )
+            modal.update_idletasks()
+            modal.destroy()
+            self._ejecutar_post_pago(id_reserva, metodo_token, monto)
+
+        def mostrar_modo_chip():
+            lbl_estado_lcd.configure(
+                text="💳 Tarjeta con Chip leída.\nCliente: Ingrese su NIP de 4 dígitos y pulse Autorizar.",
+                text_color="#FFF59D"
+            )
+            frame_nip.pack(pady=6)
+            entry_nip.focus_set()
+
+        def simular_declinada():
+            frame_nip.pack_forget()
+            lbl_estado_lcd.configure(
+                text="❌ TRANSACCIÓN DECLINADA POR EL BANCO EMISOR\n(Fondos insuficientes o tarjeta bloqueada)",
+                text_color="#FF5252"
+            )
+
+        frame_acciones_pinpad = ctk.CTkFrame(modal, fg_color="transparent")
+        frame_acciones_pinpad.pack(fill="x", padx=25, pady=8)
+
+        ctk.CTkButton(
+            frame_acciones_pinpad,
+            text="📶 Acercar Tarjeta (Contactless / NFC)",
+            height=36,
+            fg_color="#1565C0",
+            hover_color="#0D47A1",
+            command=pago_contactless
+        ).pack(fill="x", pady=4)
+
+        ctk.CTkButton(
+            frame_acciones_pinpad,
+            text="💳 Insertar Tarjeta (Chip + NIP)",
+            height=36,
+            fg_color="#00695C",
+            hover_color="#004D40",
+            command=mostrar_modo_chip
+        ).pack(fill="x", pady=4)
+
+        ctk.CTkButton(
+            frame_acciones_pinpad,
+            text="🚫 Simular Tarjeta Declinada",
+            height=34,
+            fg_color="#C62828",
+            hover_color="#8E0000",
+            command=simular_declinada
+        ).pack(fill="x", pady=4)
+
+        ctk.CTkButton(
+            modal,
+            text="Cancelar Operación",
+            width=160,
+            fg_color="gray40",
+            hover_color="gray30",
+            command=modal.destroy
+        ).pack(pady=(6, 10))
 
     def limpiar_form_factura(self):
         self.entry_fac_rfc.delete(0, "end")
@@ -1638,7 +1836,7 @@ class PanelPrincipal(ctk.CTk):
             if resp.status_code == 200:
                 fac = resp.json()
                 messagebox.showinfo(
-                    "Factura Timbrada (RF-FAC-005)",
+                    "Factura Timbrada",
                     f"¡Factura electrónica emitida con éxito!\n\n"
                     f"UUID Fiscal: {fac.get('uuid_fiscal')}\n"
                     f"RFC Receptor: {fac.get('rfc_receptor')}\n"
@@ -1647,14 +1845,13 @@ class PanelPrincipal(ctk.CTk):
                     f"IVA (16%): ${fac.get('iva_16', 0):.2f}\n"
                     f"Total Facturado: ${fac.get('total_facturado', 0):.2f}"
                 )
-                self.limpiar_form_factura()
+                self.cargar_huespedes()
             elif resp.status_code == 422:
-                # Criterio de Aceptación BDD RF-FAC-005: Error de validación de Pydantic en RFC
                 errores = resp.json().get("detail", [])
-                msg = "El RFC ingresado no cumple con la estructura fiscal válida (HTTP 422)."
+                msg = "El RFC ingresado no cumple con la estructura fiscal válida."
                 if isinstance(errores, list) and errores:
                     msg = errores[0].get("msg", msg)
-                messagebox.showerror("Error de Validación Fiscal (HTTP 422)", msg)
+                messagebox.showerror("Error de Validación de RFC", msg)
             else:
                 detalle = resp.json().get("detail", resp.text)
                 messagebox.showerror("No se pudo timbrar la factura", detalle)

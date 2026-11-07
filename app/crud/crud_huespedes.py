@@ -30,6 +30,8 @@ def actualizar_huesped(db: Session, id_huesped: int, datos: HuespedActualizar):
         db_huesped.email = datos.email
     if datos.telefono is not None:
         db_huesped.telefono = datos.telefono
+    if datos.rfc is not None:
+        db_huesped.rfc = datos.rfc
     db.commit()
     db.refresh(db_huesped)
     return db_huesped

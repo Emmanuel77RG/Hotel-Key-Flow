@@ -115,6 +115,11 @@ def timbrar_factura_pac(
     iva = round(total - subtotal, 2)
     uuid_fiscal = str(uuid.uuid4()).upper()
 
+    # Guardar o actualizar el RFC en el perfil del huésped para futuras estadías
+    if reserva.huesped and datos_factura.rfc_cliente:
+        reserva.huesped.rfc = datos_factura.rfc_cliente
+        db.commit()
+
     return {
         "mensaje": "Factura timbrada exitosamente mediante PAC (Sandbox).",
         "uuid_fiscal": uuid_fiscal,

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from sqlalchemy import text
 from app.db.database import Base, engine
 from app.api.rutas import usuarios, auth, habitaciones
 from app.models import (
@@ -21,6 +22,11 @@ from app.api.rutas import (
 
 # CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR
 Base.metadata.create_all(bind=engine)
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE huespedes ADD COLUMN IF NOT EXISTS rfc VARCHAR(20);"))
+except Exception:
+    pass
 
 # Inicializamos la aplicación
 app = FastAPI(title="API Hotel KeyFlow - Arquitectura Modular")
