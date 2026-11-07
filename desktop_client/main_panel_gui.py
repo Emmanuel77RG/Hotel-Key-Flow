@@ -1,3 +1,5 @@
+import calendar
+from datetime import date, datetime, timedelta
 import customtkinter as ctk
 import requests
 from tkinter import messagebox
@@ -116,9 +118,11 @@ class PanelPrincipal(ctk.CTk):
         self.entry_email_user.pack(pady=8)
         self.entry_pass_user = ctk.CTkEntry(frame_izq, width=240, placeholder_text="Contraseña", show="*")
         self.entry_pass_user.pack(pady=8)
-        self.combo_rol = ctk.CTkComboBox(frame_izq, width=240, values=["2 (Recepción)", "3 (Limpieza)", "1 (Administrador)"])
+        self.combo_rol = ctk.CTkOptionMenu(frame_izq, width=240, values=["2 (Recepción)", "3 (Limpieza)", "1 (Administrador)"])
+        self.combo_rol.set("2 (Recepción)")
         self.combo_rol.pack(pady=8)
-        ctk.CTkButton(frame_izq, text="Registrar Usuario", width=240, command=self.crear_usuario).pack(pady=20)
+        ctk.CTkButton(frame_izq, text="Registrar Usuario", width=240, command=self.crear_usuario).pack(pady=(15, 6))
+        ctk.CTkButton(frame_izq, text="Limpiar", width=240, fg_color="gray40", hover_color="gray30", command=self.limpiar_formulario_usuario).pack(pady=4)
 
         # Encabezado y Lista de Personal en Columna Derecha
         frame_header_der = ctk.CTkFrame(frame_der, fg_color="transparent")
@@ -244,11 +248,18 @@ class PanelPrincipal(ctk.CTk):
             respuesta = requests.post(f"{self.url_base}/usuarios/", json=datos, headers=self.headers)
             if respuesta.status_code == 200:
                 messagebox.showinfo("Éxito", "Personal registrado exitosamente.")
+                self.limpiar_formulario_usuario()
                 self.cargar_usuarios()
             else:
                 messagebox.showerror("Error", f"Fallo al registrar: {respuesta.text}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def limpiar_formulario_usuario(self):
+        self.entry_nombre_user.delete(0, "end")
+        self.entry_email_user.delete(0, "end")
+        self.entry_pass_user.delete(0, "end")
+        self.combo_rol.set("2 (Recepción)")
 
     def cargar_usuarios(self):
         if not hasattr(self, "frame_lista_usuarios"):
@@ -485,6 +496,23 @@ class PanelPrincipal(ctk.CTk):
             app_login = VentanaLogin()
             app_login.mainloop()
 
+    OPCIONES_DOCUMENTO = [
+        "Selecciona una opción",
+        "INE",
+        "Pasaporte",
+        "Cartilla Militar",
+        "Documento migratorio vigente",
+    ]
+
+    def _set_entry_readonly(self, entry_widget, valor: str, placeholder: str = ""):
+        entry_widget.configure(state="normal")
+        entry_widget.delete(0, "end")
+        if valor:
+            entry_widget.insert(0, valor)
+        elif placeholder:
+            entry_widget.configure(placeholder_text=placeholder)
+        entry_widget.configure(state="readonly")
+
     def construir_pestana_recepcion(self):
         tab_rec = self.tabview.tab("Recepción y Reservas")
         
@@ -495,13 +523,22 @@ class PanelPrincipal(ctk.CTk):
         ctk.CTkLabel(frame_huesped, text="Registro de Huésped", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 6))
         self.entry_h_nombre = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Nombre Completo")
         self.entry_h_nombre.pack(pady=3)
-        self.entry_h_doc = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Documento de Identidad")
-        self.entry_h_doc.pack(pady=3)
+        self.combo_h_doc = ctk.CTkOptionMenu(
+            frame_huesped,
+            width=250,
+            values=self.OPCIONES_DOCUMENTO
+        )
+        self.combo_h_doc.set("Selecciona una opción")
+        self.combo_h_doc.pack(pady=3)
         self.entry_h_email = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Correo Electrónico")
         self.entry_h_email.pack(pady=3)
         self.entry_h_tel = ctk.CTkEntry(frame_huesped, width=250, placeholder_text="Teléfono")
         self.entry_h_tel.pack(pady=3)
-        ctk.CTkButton(frame_huesped, text="Registrar Huésped", width=200, command=self.crear_huesped).pack(pady=8)
+
+        frame_btns_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
+        frame_btns_h.pack(pady=8)
+        ctk.CTkButton(frame_btns_h, text="Registrar Huésped", width=155, command=self.crear_huesped).pack(side="left", padx=4)
+        ctk.CTkButton(frame_btns_h, text="Limpiar", width=85, fg_color="gray40", hover_color="gray30", command=self.limpiar_formulario_huesped).pack(side="left", padx=4)
 
         frame_hdr_h = ctk.CTkFrame(frame_huesped, fg_color="transparent")
         frame_hdr_h.pack(fill="x", padx=10, pady=(6, 2))
@@ -535,9 +572,9 @@ class PanelPrincipal(ctk.CTk):
         
         ctk.CTkLabel(frame_res, text="Gestión de Reservas", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=(10, 4))
 
-        self.combo_r_hab = ctk.CTkComboBox(
+        self.combo_r_hab = ctk.CTkOptionMenu(
             frame_res,
-            width=300,
+            width=320,
             values=["Seleccione una habitación..."],
             command=self.al_seleccionar_combo_habitacion
         )
@@ -547,20 +584,61 @@ class PanelPrincipal(ctk.CTk):
         frame_inputs_res = ctk.CTkFrame(frame_res, fg_color="transparent")
         frame_inputs_res.pack(pady=2)
 
-        self.entry_r_huesped_id = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="ID Huésped")
+        self.entry_r_huesped_id = ctk.CTkEntry(frame_inputs_res, width=155, placeholder_text="ID Huésped (Usar ID)")
         self.entry_r_huesped_id.grid(row=0, column=0, padx=4, pady=3)
-        self.entry_r_hab_id = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="ID Habitación")
-        self.entry_r_hab_id.grid(row=0, column=1, padx=4, pady=3)
-        self.entry_r_f_entrada = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="Entrada (AAAA-MM-DD)")
-        self.entry_r_f_entrada.grid(row=1, column=0, padx=4, pady=3)
-        self.entry_r_f_salida = ctk.CTkEntry(frame_inputs_res, width=145, placeholder_text="Salida (AAAA-MM-DD)")
-        self.entry_r_f_salida.grid(row=1, column=1, padx=4, pady=3)
+        self.entry_r_huesped_id.configure(state="readonly")
 
-        ctk.CTkButton(frame_res, text="Crear Reserva", width=200, command=self.crear_reserva).pack(pady=6)
+        self.entry_r_hab_id = ctk.CTkEntry(frame_inputs_res, width=155, placeholder_text="ID Habitación")
+        self.entry_r_hab_id.grid(row=0, column=1, padx=4, pady=3)
+        self.entry_r_hab_id.configure(state="readonly")
+
+        # Sub-frame para Entrada con botón de mini-calendario
+        frame_f_ent = ctk.CTkFrame(frame_inputs_res, fg_color="transparent")
+        frame_f_ent.grid(row=1, column=0, padx=4, pady=3)
+        self.entry_r_f_entrada = ctk.CTkEntry(frame_f_ent, width=118, placeholder_text="Entrada")
+        self.entry_r_f_entrada.pack(side="left", padx=(0, 3))
+        self.entry_r_f_entrada.configure(state="readonly")
+        ctk.CTkButton(
+            frame_f_ent,
+            text="📅",
+            width=34,
+            command=lambda: self.abrir_mini_calendario(self.entry_r_f_entrada, "Seleccionar Fecha de Entrada", es_entrada=True)
+        ).pack(side="left")
+
+        # Sub-frame para Salida con botón de mini-calendario
+        frame_f_sal = ctk.CTkFrame(frame_inputs_res, fg_color="transparent")
+        frame_f_sal.grid(row=1, column=1, padx=4, pady=3)
+        self.entry_r_f_salida = ctk.CTkEntry(frame_f_sal, width=118, placeholder_text="Salida")
+        self.entry_r_f_salida.pack(side="left", padx=(0, 3))
+        self.entry_r_f_salida.configure(state="readonly")
+        ctk.CTkButton(
+            frame_f_sal,
+            text="📅",
+            width=34,
+            command=lambda: self.abrir_mini_calendario(self.entry_r_f_salida, "Seleccionar Fecha de Salida", es_entrada=False)
+        ).pack(side="left")
+
+        frame_btns_res = ctk.CTkFrame(frame_res, fg_color="transparent")
+        frame_btns_res.pack(pady=5)
+        ctk.CTkButton(frame_btns_res, text="Crear Reserva", width=155, command=self.crear_reserva).pack(side="left", padx=4)
+        ctk.CTkButton(frame_btns_res, text="Limpiar", width=85, fg_color="gray40", hover_color="gray30", command=self.limpiar_formulario_reserva).pack(side="left", padx=4)
         
         ctk.CTkLabel(frame_res, text="Operación de Recepción (Check-in / Check-out / Cancelar)", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(6, 3))
-        self.entry_checkin_id = ctk.CTkEntry(frame_res, width=180, placeholder_text="ID de Reserva")
-        self.entry_checkin_id.pack(pady=3)
+
+        frame_op_id = ctk.CTkFrame(frame_res, fg_color="transparent")
+        frame_op_id.pack(pady=2)
+        self.entry_checkin_id = ctk.CTkEntry(frame_op_id, width=155, placeholder_text="ID de Reserva")
+        self.entry_checkin_id.pack(side="left", padx=4)
+        self.entry_checkin_id.configure(state="readonly")
+        ctk.CTkButton(
+            frame_op_id,
+            text="Limpiar",
+            width=70,
+            height=26,
+            fg_color="gray40",
+            hover_color="gray30",
+            command=lambda: self._set_entry_readonly(self.entry_checkin_id, "", "ID de Reserva")
+        ).pack(side="left", padx=4)
 
         frame_btns_op = ctk.CTkFrame(frame_res, fg_color="transparent")
         frame_btns_op.pack(pady=4)
@@ -618,21 +696,34 @@ class PanelPrincipal(ctk.CTk):
 
     def crear_huesped(self):
         try:
+            nombre = self.entry_h_nombre.get().strip()
+            if not nombre:
+                messagebox.showwarning("Campo obligatorio", "Por favor ingresa el Nombre Completo del huésped.")
+                return
+            doc_sel = self.combo_h_doc.get()
+            doc_valor = "Sin especificar" if doc_sel == "Selecciona una opción" else doc_sel
             datos = {
-                "nombre_completo": self.entry_h_nombre.get(),
-                "documento_identidad": self.entry_h_doc.get(),
-                "email": self.entry_h_email.get(),
-                "telefono": self.entry_h_tel.get()
+                "nombre_completo": nombre,
+                "documento_identidad": doc_valor,
+                "email": self.entry_h_email.get().strip(),
+                "telefono": self.entry_h_tel.get().strip()
             }
             respuesta = requests.post(f"{self.url_base}/huespedes/", json=datos, headers=self.headers)
             if respuesta.status_code in [200, 201]:
                 h_json = respuesta.json()
                 messagebox.showinfo("Éxito", f"Huésped registrado correctamente (ID: #{h_json.get('id_huesped')}).")
+                self.limpiar_formulario_huesped()
                 self.cargar_huespedes()
             else:
                 messagebox.showerror("Error", f"No se pudo registrar: {respuesta.text}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def limpiar_formulario_huesped(self):
+        self.entry_h_nombre.delete(0, "end")
+        self.combo_h_doc.set("Selecciona una opción")
+        self.entry_h_email.delete(0, "end")
+        self.entry_h_tel.delete(0, "end")
 
     def limpiar_busqueda_huesped(self):
         if hasattr(self, "entry_buscar_huesped"):
@@ -649,14 +740,11 @@ class PanelPrincipal(ctk.CTk):
                     lista_habs = resp.json()
                 else:
                     return
-            opciones = [
+            opciones = ["Seleccione una habitación..."] + [
                 f"ID {h['id_habitacion']} - Hab. {h['numero_habitacion']} ({h['tipo']} - ${float(h.get('precio_base', 0)):.0f} [{h['estado']}])"
                 for h in lista_habs
             ]
-            if opciones:
-                self.combo_r_hab.configure(values=opciones)
-            else:
-                self.combo_r_hab.configure(values=["Sin habitaciones registradas"])
+            self.combo_r_hab.configure(values=opciones)
         except requests.exceptions.ConnectionError:
             pass
 
@@ -665,10 +753,11 @@ class PanelPrincipal(ctk.CTk):
         if opcion_seleccionada.startswith("ID "):
             try:
                 id_hab = opcion_seleccionada.split(" - ")[0].replace("ID ", "").strip()
-                self.entry_r_hab_id.delete(0, "end")
-                self.entry_r_hab_id.insert(0, id_hab)
+                self._set_entry_readonly(self.entry_r_hab_id, id_hab, "ID Habitación")
             except Exception:
                 pass
+        else:
+            self._set_entry_readonly(self.entry_r_hab_id, "", "ID Habitación")
 
     def cargar_huespedes(self):
         if not hasattr(self, "frame_lista_huespedes"):
@@ -692,9 +781,10 @@ class PanelPrincipal(ctk.CTk):
                     fila = ctk.CTkFrame(self.frame_lista_huespedes)
                     fila.pack(fill="x", pady=2, padx=2)
 
+                    doc_mostrar = h.get("documento_identidad") or "Sin especificar"
                     ctk.CTkLabel(
                         fila,
-                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({h['documento_identidad']})",
+                        text=f"#{h['id_huesped']} {h['nombre_completo']} ({doc_mostrar})",
                         font=ctk.CTkFont(size=12)
                     ).pack(side="left", padx=6, pady=4)
 
@@ -718,8 +808,7 @@ class PanelPrincipal(ctk.CTk):
             pass
 
     def seleccionar_huesped_id(self, id_huesped):
-        self.entry_r_huesped_id.delete(0, "end")
-        self.entry_r_huesped_id.insert(0, str(id_huesped))
+        self._set_entry_readonly(self.entry_r_huesped_id, str(id_huesped), "ID Huésped (Usar ID)")
 
     def abrir_modal_editar_huesped(self, huesped):
         modal = ctk.CTkToplevel(self)
@@ -733,9 +822,13 @@ class PanelPrincipal(ctk.CTk):
         e_nombre.insert(0, huesped.get("nombre_completo", "") or "")
         e_nombre.pack(pady=5)
 
-        e_doc = ctk.CTkEntry(modal, width=250, placeholder_text="Documento de Identidad")
-        e_doc.insert(0, huesped.get("documento_identidad", "") or "")
-        e_doc.pack(pady=5)
+        combo_doc = ctk.CTkOptionMenu(modal, width=250, values=self.OPCIONES_DOCUMENTO)
+        doc_actual = huesped.get("documento_identidad") or "Selecciona una opción"
+        if doc_actual in self.OPCIONES_DOCUMENTO:
+            combo_doc.set(doc_actual)
+        else:
+            combo_doc.set("Selecciona una opción")
+        combo_doc.pack(pady=5)
 
         e_email = ctk.CTkEntry(modal, width=250, placeholder_text="Correo Electrónico")
         e_email.insert(0, huesped.get("email", "") or "")
@@ -746,9 +839,11 @@ class PanelPrincipal(ctk.CTk):
         e_tel.pack(pady=5)
 
         def guardar():
+            doc_sel = combo_doc.get()
+            doc_val = "Sin especificar" if doc_sel == "Selecciona una opción" else doc_sel
             datos = {
                 "nombre_completo": e_nombre.get().strip(),
-                "documento_identidad": e_doc.get().strip(),
+                "documento_identidad": doc_val,
                 "email": e_email.get().strip(),
                 "telefono": e_tel.get().strip(),
             }
@@ -768,6 +863,144 @@ class PanelPrincipal(ctk.CTk):
                 messagebox.showerror("Error", str(e))
 
         ctk.CTkButton(modal, text="Guardar Cambios", width=180, command=guardar).pack(pady=15)
+
+    def abrir_mini_calendario(self, entry_destino, titulo="Seleccionar Fecha", es_entrada=True):
+        modal = ctk.CTkToplevel(self)
+        modal.title(titulo)
+        modal.geometry("320x330")
+        modal.resizable(False, False)
+        modal.grab_set()
+
+        # Determinar mes/año inicial a partir del campo o la fecha actual
+        hoy = date.today()
+        valor_actual = entry_destino.get().strip()
+        fecha_base = hoy
+        if valor_actual:
+            try:
+                fecha_base = datetime.strptime(valor_actual, "%Y-%m-%d").date()
+            except ValueError:
+                fecha_base = hoy
+
+        estado_cal = {"anio": fecha_base.year, "mes": fecha_base.month}
+        nombres_meses = [
+            "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ]
+
+        frame_nav = ctk.CTkFrame(modal, fg_color="transparent")
+        frame_nav.pack(fill="x", padx=12, pady=(10, 4))
+
+        lbl_mes_anio = ctk.CTkLabel(frame_nav, text="", font=ctk.CTkFont(size=15, weight="bold"))
+
+        frame_dias = ctk.CTkFrame(modal)
+        frame_dias.pack(fill="both", expand=True, padx=12, pady=4)
+
+        def seleccionar_dia(dia_num: int):
+            fecha_elegida = date(estado_cal["anio"], estado_cal["mes"], dia_num)
+            self._set_entry_readonly(entry_destino, fecha_elegida.strftime("%Y-%m-%d"))
+            # Si eligió fecha de entrada y la salida está vacía o es menor/igual, sugerir +1 noche automáticamente
+            if es_entrada:
+                sal_txt = self.entry_r_f_salida.get().strip()
+                sugerir = False
+                if not sal_txt:
+                    sugerir = True
+                else:
+                    try:
+                        if datetime.strptime(sal_txt, "%Y-%m-%d").date() <= fecha_elegida:
+                            sugerir = True
+                    except ValueError:
+                        sugerir = True
+                if sugerir:
+                    manana = fecha_elegida + timedelta(days=1)
+                    self._set_entry_readonly(self.entry_r_f_salida, manana.strftime("%Y-%m-%d"))
+            modal.destroy()
+
+        def renderizar_mes():
+            for w in frame_dias.winfo_children():
+                w.destroy()
+            lbl_mes_anio.configure(text=f"{nombres_meses[estado_cal['mes']]} {estado_cal['anio']}")
+
+            dias_semana = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"]
+            for idx, d_nom in enumerate(dias_semana):
+                ctk.CTkLabel(
+                    frame_dias,
+                    text=d_nom,
+                    width=34,
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                    text_color="#64B5F6"
+                ).grid(row=0, column=idx, padx=2, pady=3)
+
+            cal_matriz = calendar.monthcalendar(estado_cal["anio"], estado_cal["mes"])
+            for fila_idx, semana in enumerate(cal_matriz, start=1):
+                for col_idx, dia in enumerate(semana):
+                    if dia == 0:
+                        ctk.CTkLabel(frame_dias, text="", width=34).grid(row=fila_idx, column=col_idx, padx=2, pady=2)
+                    else:
+                        es_hoy = (
+                            dia == hoy.day
+                            and estado_cal["mes"] == hoy.month
+                            and estado_cal["anio"] == hoy.year
+                        )
+                        color_btn = "#2E7D32" if es_hoy else "#1F6AA5"
+                        ctk.CTkButton(
+                            frame_dias,
+                            text=str(dia),
+                            width=34,
+                            height=28,
+                            fg_color=color_btn,
+                            command=lambda d=dia: seleccionar_dia(d)
+                        ).grid(row=fila_idx, column=col_idx, padx=2, pady=2)
+
+        def mes_anterior():
+            if estado_cal["mes"] == 1:
+                estado_cal["mes"] = 12
+                estado_cal["anio"] -= 1
+            else:
+                estado_cal["mes"] -= 1
+            renderizar_mes()
+
+        def mes_siguiente():
+            if estado_cal["mes"] == 12:
+                estado_cal["mes"] = 1
+                estado_cal["anio"] += 1
+            else:
+                estado_cal["mes"] += 1
+            renderizar_mes()
+
+        ctk.CTkButton(frame_nav, text="◀", width=36, height=26, command=mes_anterior).pack(side="left")
+        lbl_mes_anio.pack(side="left", expand=True)
+        ctk.CTkButton(frame_nav, text="▶", width=36, height=26, command=mes_siguiente).pack(side="right")
+
+        frame_footer = ctk.CTkFrame(modal, fg_color="transparent")
+        frame_footer.pack(fill="x", padx=12, pady=(2, 8))
+        ctk.CTkButton(
+            frame_footer,
+            text="Seleccionar Hoy",
+            width=130,
+            height=26,
+            fg_color="#2E7D32",
+            command=lambda: (
+                estado_cal.update({"anio": hoy.year, "mes": hoy.month}),
+                seleccionar_dia(hoy.day)
+            )
+        ).pack(side="left", padx=4)
+        ctk.CTkButton(
+            frame_footer,
+            text="Cerrar",
+            width=90,
+            height=26,
+            fg_color="gray40",
+            command=modal.destroy
+        ).pack(side="right", padx=4)
+
+        renderizar_mes()
+
+    def limpiar_formulario_reserva(self):
+        self.combo_r_hab.set("Seleccione una habitación...")
+        self._set_entry_readonly(self.entry_r_huesped_id, "", "ID Huésped (Usar ID)")
+        self._set_entry_readonly(self.entry_r_hab_id, "", "ID Habitación")
+        self._set_entry_readonly(self.entry_r_f_entrada, "", "Entrada")
+        self._set_entry_readonly(self.entry_r_f_salida, "", "Salida")
 
     def cargar_reservas(self):
         if not hasattr(self, "frame_lista_reservas"):
@@ -812,14 +1045,22 @@ class PanelPrincipal(ctk.CTk):
             pass
 
     def seleccionar_reserva_id(self, id_reserva):
-        self.entry_checkin_id.delete(0, "end")
-        self.entry_checkin_id.insert(0, str(id_reserva))
+        self._set_entry_readonly(self.entry_checkin_id, str(id_reserva), "ID de Reserva")
         if hasattr(self, "entry_folio_reserva_id"):
             self.entry_folio_reserva_id.delete(0, "end")
             self.entry_folio_reserva_id.insert(0, str(id_reserva))
 
     def crear_reserva(self):
         try:
+            if not self.entry_r_huesped_id.get().strip():
+                messagebox.showwarning("Dato faltante", "Selecciona un huésped de la lista con el botón 'Usar ID'.")
+                return
+            if not self.entry_r_hab_id.get().strip():
+                messagebox.showwarning("Dato faltante", "Selecciona una habitación del menú desplegable.")
+                return
+            if not self.entry_r_f_entrada.get().strip() or not self.entry_r_f_salida.get().strip():
+                messagebox.showwarning("Fechas faltantes", "Selecciona las fechas de Entrada y Salida usando el botón de calendario (📅).")
+                return
             datos = {
                 "fecha_entrada": self.entry_r_f_entrada.get(),
                 "fecha_salida": self.entry_r_f_salida.get(),
@@ -832,6 +1073,7 @@ class PanelPrincipal(ctk.CTk):
             if respuesta.status_code in [200, 201]:
                 res_json = respuesta.json()
                 messagebox.showinfo("Éxito", f"Reserva creada con éxito. ID Asignado: {res_json.get('id_reserva')}")
+                self.limpiar_formulario_reserva()
                 self.cargar_reservas()
             elif respuesta.status_code == 409:
                 # Criterio de Aceptación BDD RF-RES-003 (Prevención de Overbooking)

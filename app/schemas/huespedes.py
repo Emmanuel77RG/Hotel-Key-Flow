@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 class HuespedBase(BaseModel):
-    documento_identidad: str
+    documento_identidad: Optional[str] = "Sin especificar"
     nombre_completo: str
     email: Optional[str] = None
     telefono: Optional[str] = None

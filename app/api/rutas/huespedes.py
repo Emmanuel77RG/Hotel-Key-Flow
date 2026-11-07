@@ -22,12 +22,10 @@ def crear_huesped(
     db: Session = Depends(get_db),
     usuario_actual=Depends(get_usuario_actual),
 ):
-    existente = crud_huespedes.obtener_huesped_por_documento(db, documento_identidad=huesped.documento_identidad)
-    if existente:
-        raise HTTPException(
-            status_code=400,
-            detail="Ya existe un huésped registrado con ese documento de identidad"
-        )
+    if not huesped.nombre_completo or not huesped.nombre_completo.strip():
+        raise HTTPException(status_code=400, detail="El nombre completo del huésped es obligatorio")
+    if not huesped.documento_identidad or huesped.documento_identidad.strip() in ("", "Selecciona una opción"):
+        huesped.documento_identidad = "Sin especificar"
     return crud_huespedes.crear_huesped(db=db, huesped=huesped)
 
 @router.put("/{id_huesped}", response_model=HuespedRespuesta, summary="Modificar datos de un huésped")
@@ -37,13 +35,8 @@ def modificar_huesped(
     db: Session = Depends(get_db),
     usuario_actual=Depends(get_usuario_actual),
 ):
-    if datos.documento_identidad:
-        existente = crud_huespedes.obtener_huesped_por_documento(db, documento_identidad=datos.documento_identidad)
-        if existente and existente.id_huesped != id_huesped:
-            raise HTTPException(
-                status_code=400,
-                detail="Ya existe otro huésped registrado con ese documento de identidad"
-            )
+    if datos.documento_identidad is not None and datos.documento_identidad.strip() in ("", "Selecciona una opción"):
+        datos.documento_identidad = "Sin especificar"
     actualizado = crud_huespedes.actualizar_huesped(db, id_huesped=id_huesped, datos=datos)
     if not actualizado:
         raise HTTPException(status_code=404, detail="Huésped no encontrado")
