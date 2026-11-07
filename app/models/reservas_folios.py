@@ -24,3 +24,8 @@ class ReservaFolio(Base):
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     habitaciones = relationship("Habitacion", secondary=reservas_habitaciones, backref="reservas")
+    huesped = relationship("Huesped")
+
+    @property
+    def nombre_huesped(self):
+        return self.huesped.nombre_completo if self.huesped else None

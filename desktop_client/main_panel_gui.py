@@ -772,7 +772,9 @@ class PanelPrincipal(ctk.CTk):
         try:
             resp = requests.get(f"{self.url_base}/huespedes/", headers=self.headers)
             if resp.status_code == 200:
+                self.mapa_huespedes = {}
                 for h in resp.json():
+                    self.mapa_huespedes[h["id_huesped"]] = h.get("nombre_completo") or f"Huésped #{h['id_huesped']}"
                     nombre = (h.get("nombre_completo") or "").lower()
                     doc = (h.get("documento_identidad") or "").lower()
                     if filtro and filtro not in nombre and filtro not in doc:
@@ -857,6 +859,7 @@ class PanelPrincipal(ctk.CTk):
                     messagebox.showinfo("Éxito", "Datos del huésped actualizados.")
                     modal.destroy()
                     self.cargar_huespedes()
+                    self.cargar_reservas()
                 else:
                     messagebox.showerror("Error", f"No se pudo actualizar: {r.text}")
             except Exception as e:
@@ -1023,8 +1026,13 @@ class PanelPrincipal(ctk.CTk):
 
                     est = r.get("estado_reserva", "")
                     color_txt = colores_res.get(est, "white")
+                    nombre_huesped = (
+                        r.get("nombre_huesped")
+                        or getattr(self, "mapa_huespedes", {}).get(r.get("id_huesped"))
+                        or f"Huésped #{r.get('id_huesped')}"
+                    )
                     texto = (
-                        f"Reserva #{r['id_reserva']} | Huésped #{r['id_huesped']} | "
+                        f"Reserva #{r['id_reserva']} | {nombre_huesped} | "
                         f"{r['fecha_entrada']} -> {r['fecha_salida']} [{est}]"
                     )
                     ctk.CTkLabel(
