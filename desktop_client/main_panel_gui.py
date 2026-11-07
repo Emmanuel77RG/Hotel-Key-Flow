@@ -2164,23 +2164,14 @@ class PanelPrincipal(ctk.CTk):
             text_color="gray75"
         ).pack(pady=(2, 1))
 
+        self.mapa_hab_mantenimiento = {}
         self.combo_mant_hab = ctk.CTkOptionMenu(
             frame_izq_m,
             width=295,
-            values=["Seleccione una habitación..."],
-            command=self.al_seleccionar_combo_hab_mantenimiento
+            values=["Seleccione una habitación..."]
         )
         self.combo_mant_hab.set("Seleccione una habitación...")
         self.combo_mant_hab.pack(pady=2)
-
-        self.entry_mant_hab_id = ctk.CTkEntry(
-            frame_izq_m,
-            width=295,
-            height=26,
-            placeholder_text="ID Habitación (Automático)"
-        )
-        self.entry_mant_hab_id.pack(pady=2)
-        self.entry_mant_hab_id.configure(state="readonly")
 
         ctk.CTkLabel(
             frame_izq_m,
@@ -2369,23 +2360,15 @@ class PanelPrincipal(ctk.CTk):
                     lista_habs = resp.json()
                 else:
                     return
-            opciones = ["Seleccione una habitación..."] + [
-                f"ID {h['id_habitacion']} - Hab. {h['numero_habitacion']} ({h['tipo']} [{h['estado']}])"
-                for h in lista_habs
-            ]
+            self.mapa_hab_mantenimiento = {}
+            opciones = ["Seleccione una habitación..."]
+            for h in lista_habs:
+                etiqueta = f"Hab. {h['numero_habitacion']} - {h['tipo']} [{h['estado']}]"
+                self.mapa_hab_mantenimiento[etiqueta] = h["id_habitacion"]
+                opciones.append(etiqueta)
             self.combo_mant_hab.configure(values=opciones)
         except requests.exceptions.ConnectionError:
             pass
-
-    def al_seleccionar_combo_hab_mantenimiento(self, opcion: str):
-        if opcion.startswith("ID "):
-            try:
-                id_hab = opcion.split(" - ")[0].replace("ID ", "").strip()
-                self._set_entry_readonly(self.entry_mant_hab_id, id_hab, "ID Habitación (Automático)")
-            except Exception:
-                pass
-        else:
-            self._set_entry_readonly(self.entry_mant_hab_id, "", "ID Habitación (Automático)")
 
     def al_seleccionar_falla_rapida(self, opcion: str):
         if opcion in self.CATALOGO_FALLAS_COMUNES:
@@ -2397,15 +2380,15 @@ class PanelPrincipal(ctk.CTk):
 
     def limpiar_form_mantenimiento(self):
         self.combo_mant_hab.set("Seleccione una habitación...")
-        self._set_entry_readonly(self.entry_mant_hab_id, "", "ID Habitación (Automático)")
         self.combo_falla_rapida.set("Seleccione falla común (opcional)...")
         self.combo_mant_categoria.set("Selecciona una categoría")
         self.combo_mant_prioridad.set("Media")
         self.entry_mant_desc.delete(0, "end")
 
     def crear_ticket_mantenimiento_gui(self):
-        id_hab_txt = self.entry_mant_hab_id.get().strip()
-        if not id_hab_txt:
+        hab_sel = self.combo_mant_hab.get()
+        id_hab = getattr(self, "mapa_hab_mantenimiento", {}).get(hab_sel)
+        if not id_hab:
             messagebox.showwarning("Habitación requerida", "Selecciona una habitación del menú desplegable.")
             return
         desc = self.entry_mant_desc.get().strip()
@@ -2417,7 +2400,7 @@ class PanelPrincipal(ctk.CTk):
         prioridad = self.combo_mant_prioridad.get()
         try:
             datos = {
-                "id_habitacion": int(id_hab_txt),
+                "id_habitacion": int(id_hab),
                 "categoria": categoria,
                 "prioridad": prioridad,
                 "descripcion_falla": desc,
