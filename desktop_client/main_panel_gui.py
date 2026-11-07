@@ -793,21 +793,51 @@ class PanelPrincipal(ctk.CTk):
                     ctk.CTkButton(
                         fila,
                         text="Usar ID",
-                        width=58,
+                        width=55,
                         height=24,
                         fg_color="#2E7D32",
                         command=lambda hid=h["id_huesped"]: self.seleccionar_huesped_id(hid)
-                    ).pack(side="right", padx=3, pady=3)
+                    ).pack(side="right", padx=2, pady=3)
+
+                    ctk.CTkButton(
+                        fila,
+                        text="Eliminar",
+                        width=58,
+                        height=24,
+                        fg_color="#C62828",
+                        hover_color="#8E0000",
+                        command=lambda hid=h["id_huesped"], hnom=h["nombre_completo"]: self.eliminar_huesped_gui(hid, hnom)
+                    ).pack(side="right", padx=2, pady=3)
 
                     ctk.CTkButton(
                         fila,
                         text="Editar",
-                        width=55,
+                        width=52,
                         height=24,
                         command=lambda hdata=h: self.abrir_modal_editar_huesped(hdata)
-                    ).pack(side="right", padx=3, pady=3)
+                    ).pack(side="right", padx=2, pady=3)
         except requests.exceptions.ConnectionError:
             pass
+
+    def eliminar_huesped_gui(self, id_huesped: int, nombre: str):
+        confirmar = messagebox.askyesno(
+            "Confirmar Eliminación",
+            f"¿Deseas eliminar al huésped '{nombre}' (#{id_huesped})?\n\nNota: Solo se permite si no tiene reservaciones registradas."
+        )
+        if not confirmar:
+            return
+        try:
+            resp = requests.delete(f"{self.url_base}/huespedes/{id_huesped}", headers=self.headers)
+            if resp.status_code == 200:
+                messagebox.showinfo("Éxito", resp.json().get("mensaje", "Huésped eliminado correctamente."))
+                if self.entry_r_huesped_id.get().strip() == str(id_huesped):
+                    self._set_entry_readonly(self.entry_r_huesped_id, "", "ID Huésped (Usar ID)")
+                self.cargar_huespedes()
+            else:
+                detalle = resp.json().get("detail", resp.text)
+                messagebox.showerror("No se puede eliminar", detalle)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
     def seleccionar_huesped_id(self, id_huesped):
         self._set_entry_readonly(self.entry_r_huesped_id, str(id_huesped), "ID Huésped (Usar ID)")
@@ -1031,8 +1061,9 @@ class PanelPrincipal(ctk.CTk):
                         or getattr(self, "mapa_huespedes", {}).get(r.get("id_huesped"))
                         or f"Huésped #{r.get('id_huesped')}"
                     )
+                    hab_txt = r.get("numeros_habitaciones") or "Sin hab."
                     texto = (
-                        f"Reserva #{r['id_reserva']} | {nombre_huesped} | "
+                        f"Reserva #{r['id_reserva']} | {nombre_huesped} | Hab. {hab_txt} | "
                         f"{r['fecha_entrada']} -> {r['fecha_salida']} [{est}]"
                     )
                     ctk.CTkLabel(

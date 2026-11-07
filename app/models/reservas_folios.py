@@ -29,3 +29,9 @@ class ReservaFolio(Base):
     @property
     def nombre_huesped(self):
         return self.huesped.nombre_completo if self.huesped else None
+
+    @property
+    def numeros_habitaciones(self):
+        if self.habitaciones:
+            return ", ".join(str(h.numero_habitacion) for h in self.habitaciones)
+        return "Sin hab."

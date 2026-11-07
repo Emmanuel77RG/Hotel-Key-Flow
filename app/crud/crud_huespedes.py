@@ -33,3 +33,11 @@ def actualizar_huesped(db: Session, id_huesped: int, datos: HuespedActualizar):
     db.commit()
     db.refresh(db_huesped)
     return db_huesped
+
+def eliminar_huesped(db: Session, id_huesped: int):
+    db_huesped = obtener_huesped(db, id_huesped)
+    if not db_huesped:
+        return False
+    db.delete(db_huesped)
+    db.commit()
+    return True

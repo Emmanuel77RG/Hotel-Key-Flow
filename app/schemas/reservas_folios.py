@@ -16,6 +16,7 @@ class ReservaCrear(ReservaFolioBase):
 class ReservaRespuesta(ReservaFolioBase):
     id_reserva: int
     nombre_huesped: Optional[str] = None
+    numeros_habitaciones: Optional[str] = None
     fecha_creacion: Optional[datetime] = None
     fecha_actualizacion: Optional[datetime] = None
 
