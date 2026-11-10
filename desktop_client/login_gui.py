@@ -10,13 +10,16 @@ ctk.set_appearance_mode("Dark")  # Opciones: "System", "Dark", "Light"
 ctk.set_default_color_theme("blue")
 
 class VentanaLogin(ctk.CTk):
+    ANCHO_VENTANA = 400
+    ALTO_VENTANA = 500
+
     def __init__(self):
         super().__init__()
         self.http = requests.Session()
         
         self.title("Hotel KeyFlow - Acceso")
-        self.geometry("400x500")
         self.resizable(False, False)
+        self.centrar_ventana()
         
         # Logo del sistema
         ruta_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
@@ -44,7 +47,19 @@ class VentanaLogin(ctk.CTk):
         # Botón Iniciar Sesión
         self.btn_login = ctk.CTkButton(self, text="Iniciar Sesión", width=280, height=40, font=ctk.CTkFont(weight="bold"), command=self.procesar_login)
         self.btn_login.pack(pady=20)
-        
+
+        # Reasegurar centrado tras inicialización de CustomTkinter y escalado DPI
+        self.after(10, self.centrar_ventana)
+
+    def centrar_ventana(self):
+        """Calcula las coordenadas exactas de la pantalla para centrar la ventana."""
+        self.update_idletasks()
+        pantalla_ancho = self.winfo_screenwidth()
+        pantalla_alto = self.winfo_screenheight()
+        pos_x = max(0, (pantalla_ancho - self.ANCHO_VENTANA) // 2)
+        pos_y = max(0, (pantalla_alto - self.ALTO_VENTANA) // 2)
+        self.geometry(f"{self.ANCHO_VENTANA}x{self.ALTO_VENTANA}+{pos_x}+{pos_y}")
+
     def procesar_login(self, *_args):
         email = self.entry_email.get()
         password = self.entry_password.get()
