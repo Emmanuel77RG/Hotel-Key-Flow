@@ -24,9 +24,9 @@ from app.api.rutas import (
     reportes,
 )
 
-# CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR
-Base.metadata.create_all(bind=engine)
+# CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR (o difiere si la BD está iniciando)
 try:
+    Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE huespedes ADD COLUMN IF NOT EXISTS rfc VARCHAR(20);"))
         conn.execute(text("ALTER TABLE pagos ALTER COLUMN metodo_pago TYPE VARCHAR(100);"))
