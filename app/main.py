@@ -3,15 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.database import Base, engine
 from app.api.dependencias import get_db
-from app.models import (
-    usuarios as usuarios_model,
-    habitaciones as habitaciones_model,
-    huespedes as huespedes_model,
-    reservas_folios as reservas_model,
-    mantenimiento as mantenimiento_model,
-    finanzas as finanzas_model,
-    pos as pos_model,
-)
+from app.core.logging_config import inicializar_logging
 from app.api.rutas import (
     usuarios,
     auth,
@@ -24,7 +16,10 @@ from app.api.rutas import (
     reportes,
 )
 
-# CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR (o difiere si la BD está iniciando)
+# Inicializar logging centralizado con rotación a archivo
+logger = inicializar_logging()
+
+# Inicialización segura de tablas
 try:
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
@@ -33,10 +28,10 @@ try:
         conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) DEFAULT 'General';"))
         conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS prioridad VARCHAR(30) DEFAULT 'Media';"))
         conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS nota_resolucion VARCHAR(255);"))
-except Exception:
-    pass
+except Exception as exc:
+    logger.warning("Base de datos no disponible durante inicialización estática: %s", exc)
 
-# Inicializamos la aplicación
+# Inicializamos la aplicación FastAPI
 app = FastAPI(
     title="API Hotel KeyFlow - Arquitectura Modular",
     description="Sistema PMS local para gestión hotelera, reservas, folios, mantenimiento y POS.",
@@ -66,6 +61,7 @@ def healthcheck(db: Session = Depends(get_db)):
         db_status = "healthy"
     except Exception as exc:
         db_status = f"unhealthy: {exc}"
+        logger.error("Fallo de salud en base de datos: %s", exc)
 
     estado_general = "healthy" if db_status == "healthy" else "degraded"
     codigo_http = status.HTTP_200_OK if db_status == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE

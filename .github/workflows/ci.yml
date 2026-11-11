@@ -1,0 +1,40 @@
+name: CI Hotel KeyFlow
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-lint:
+    name: Pruebas Automatizadas y Calidad de Código
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar entorno Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ejecutar suite de pruebas con Pytest
+        env:
+          DATABASE_URL: sqlite:///:memory:
+          SECRET_KEY: test-secret-key-for-github-actions-ci-pipeline-keyflow
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES: 60
+        run: |
+          pytest -v --cov=app --cov-report=term-missing

@@ -77,8 +77,8 @@ class VentanaLogin(ctk.CTk):
         url_api = "http://127.0.0.1:8000/login"
         
         try:
-            # Enviamos la petición a nuestro Backend reutilizando sesión HTTP
-            respuesta = self.http.post(url_api, data=datos_formulario)
+            # Enviamos la petición a nuestro Backend reutilizando sesión HTTP con timeout explícito
+            respuesta = self.http.post(url_api, data=datos_formulario, timeout=10)
             
             if respuesta.status_code == 200:
                 # ¡Acceso concedido! Extraemos el token y el rol

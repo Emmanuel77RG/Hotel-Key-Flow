@@ -6,7 +6,8 @@ class Huesped(Base):
     __tablename__ = "huespedes"
 
     id_huesped = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    documento_identidad = Column(String(50), nullable=True, default="Sin especificar")
+    # Regla de Integridad Referencial: UNIQUE para impedir documentos de identidad duplicados
+    documento_identidad = Column(String(50), unique=True, index=True, nullable=False)
     nombre_completo = Column(String(150), nullable=False)
     email = Column(String(100), nullable=True)
     telefono = Column(String(20), nullable=True)

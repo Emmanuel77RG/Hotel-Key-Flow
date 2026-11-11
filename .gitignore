@@ -7,3 +7,8 @@ __pycache__/
 facturas_emitidas/
 desktop_client/reportes_pdf/
 *.session.sql
+logs/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
