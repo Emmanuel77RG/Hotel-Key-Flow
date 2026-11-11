@@ -1,12 +1,12 @@
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional
 
 class CargoBase(BaseModel):
-    monto: float
-    descripcion: str
-    id_reserva: int
+    monto: float = Field(..., gt=0, description="Monto del cargo (debe ser mayor a $0.00)")
+    descripcion: str = Field(..., min_length=1, max_length=255, description="Concepto del cargo")
+    id_reserva: int = Field(..., gt=0)
 
 class CargoCrear(CargoBase):
     pass
@@ -19,9 +19,9 @@ class CargoRespuesta(CargoBase):
         from_attributes = True
 
 class PagoBase(BaseModel):
-    monto: float
-    metodo_pago: str
-    id_reserva: int
+    monto: float = Field(..., gt=0, description="Monto del pago (debe ser mayor a $0.00)")
+    metodo_pago: str = Field(..., min_length=1, max_length=100, description="Método de pago utilizado")
+    id_reserva: int = Field(..., gt=0)
     id_usuario: Optional[int] = None
 
 class PagoCrear(PagoBase):
@@ -35,7 +35,7 @@ class PagoRespuesta(PagoBase):
         from_attributes = True
 
 class FacturaSolicitar(BaseModel):
-    id_reserva: int
+    id_reserva: int = Field(..., gt=0)
     rfc_cliente: str
     razon_social: Optional[str] = "PÚBLICO EN GENERAL"
 

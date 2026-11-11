@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, status
+from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.database import Base, engine
-from app.api.rutas import usuarios, auth, habitaciones
+from app.api.dependencias import get_db
 from app.models import (
     usuarios as usuarios_model,
     habitaciones as habitaciones_model,
@@ -9,7 +10,7 @@ from app.models import (
     reservas_folios as reservas_model,
     mantenimiento as mantenimiento_model,
     finanzas as finanzas_model,
-    pos as pos_model
+    pos as pos_model,
 )
 from app.api.rutas import (
     usuarios,
@@ -20,7 +21,7 @@ from app.api.rutas import (
     mantenimiento,
     finanzas,
     pos,
-    reportes
+    reportes,
 )
 
 # CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR
@@ -36,7 +37,11 @@ except Exception:
     pass
 
 # Inicializamos la aplicación
-app = FastAPI(title="API Hotel KeyFlow - Arquitectura Modular")
+app = FastAPI(
+    title="API Hotel KeyFlow - Arquitectura Modular",
+    description="Sistema PMS local para gestión hotelera, reservas, folios, mantenimiento y POS.",
+    version="0.7.0",
+)
 
 # Conectamos las rutas (Endpoints)
 app.include_router(auth.router, tags=["Autenticación"])
@@ -49,7 +54,24 @@ app.include_router(finanzas.router, prefix="/finanzas", tags=["Cargos y Pagos"])
 app.include_router(pos.router, prefix="/pos", tags=["Punto de Venta (Restaurante y Room Service)"])
 app.include_router(reportes.router, prefix="/reportes", tags=["Reportes Operativos y Corte de Caja"])
 
-# Ruta de comprobación de estado
+# Rutas de comprobación de estado y Healthcheck (Punto 20)
 @app.get("/", tags=["Status"])
 def check_status():
     return {"mensaje": "¡Conexión exitosa! La API modular de Hotel KeyFlow está corriendo a la perfección."}
+
+@app.get("/health", tags=["Status"], summary="Healthcheck del sistema y base de datos")
+def healthcheck(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "healthy"
+    except Exception as exc:
+        db_status = f"unhealthy: {exc}"
+
+    estado_general = "healthy" if db_status == "healthy" else "degraded"
+    codigo_http = status.HTTP_200_OK if db_status == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return {
+        "status": estado_general,
+        "database": db_status,
+        "version": "0.7.0",
+    }
