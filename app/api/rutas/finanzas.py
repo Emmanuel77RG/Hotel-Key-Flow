@@ -12,6 +12,7 @@ from app.schemas.finanzas import (
     FacturaSolicitar,
 )
 from app.crud import crud_finanzas, crud_reservas_folios
+from app.core.security import enmascarar_token_pago
 
 router = APIRouter()
 
@@ -54,7 +55,22 @@ def listar_pagos(
     db: Session = Depends(get_db),
     usuario_actual=Depends(get_usuario_actual),
 ):
-    return crud_finanzas.obtener_pagos(db, skip=skip, limit=limit)
+    pagos = crud_finanzas.obtener_pagos(db, skip=skip, limit=limit)
+    if usuario_actual.id_rol != 1:
+        resultado = []
+        for p in pagos:
+            resultado.append(
+                PagoRespuesta(
+                    id_pago=p.id_pago,
+                    id_reserva=p.id_reserva,
+                    monto=p.monto,
+                    metodo_pago=enmascarar_token_pago(p.metodo_pago),
+                    id_usuario=p.id_usuario,
+                    fecha_creacion=p.fecha_creacion,
+                )
+            )
+        return resultado
+    return pagos
 
 @router.post("/pagos", response_model=PagoRespuesta, summary="Registrar un pago descontando del saldo de la Cuenta Folio (RF-FAC-004)")
 def crear_pago(
@@ -83,12 +99,22 @@ def crear_pago(
         )
 
     # RNF-SEG-003: Si el pago es con Tarjeta, se tokeniza sin almacenar PAN ni CVV
-    if "tarjeta" in pago.metodo_pago.lower() and "tok_" not in pago.metodo_pago.lower():
+    if "tarjeta" in pago.metodo_pago.lower() and "tok" not in pago.metodo_pago.lower():
         token_simulado = f"tok_{uuid.uuid4().hex[:8]}"
         pago.metodo_pago = f"Tarjeta (Token: {token_simulado})"
 
     pago.id_usuario = usuario_actual.id_usuario
-    return crud_finanzas.crear_pago(db=db, pago=pago)
+    pago_creado = crud_finanzas.crear_pago(db=db, pago=pago)
+    if usuario_actual.id_rol != 1:
+        return PagoRespuesta(
+            id_pago=pago_creado.id_pago,
+            id_reserva=pago_creado.id_reserva,
+            monto=pago_creado.monto,
+            metodo_pago=enmascarar_token_pago(pago_creado.metodo_pago),
+            id_usuario=pago_creado.id_usuario,
+            fecha_creacion=pago_creado.fecha_creacion,
+        )
+    return pago_creado
 
 # --- Endpoint de Facturación Electrónica PAC Sandbox (RF-FAC-005) ---
 @router.post("/facturar", summary="Timbrar Factura Electrónica ante el PAC (RF-FAC-005)")

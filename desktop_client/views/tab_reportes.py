@@ -167,9 +167,13 @@ class TabReportesView:
         )
         self.lbl_rep_resumen_cargos.pack(pady=(6, 2))
 
+        opciones_fin = ["Pagos Recibidos (Corte de Caja)", "Cargos Generados (Hospedaje y POS)"]
+        if getattr(self.app, "id_rol", None) == 1:
+            opciones_fin.append("Relación de Transacciones (Auditoría)")
+
         self.seg_vista_finanzas = ctk.CTkSegmentedButton(
             frame_izq_rep,
-            values=["Pagos Recibidos (Corte de Caja)", "Cargos Generados (Hospedaje y POS)"],
+            values=opciones_fin,
             command=lambda _v: (setattr(self, "pag_rep_fin", 1), self.renderizar_lista_financiera_reporte())
         )
         self.seg_vista_finanzas.set("Pagos Recibidos (Corte de Caja)")
@@ -374,6 +378,81 @@ class TabReportesView:
                     text=f"Método: {metodo}   |   Cajero: {p.get('cajero', '')}   |   Fecha: {p.get('fecha_creacion', '')}",
                     font=ctk.CTkFont(size=10),
                     text_color=color_met,
+                    anchor="w"
+                ).pack(fill="x")
+
+                ctk.CTkLabel(
+                    card,
+                    text=f"+ ${float(p.get('monto', 0.0)):.2f}",
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                    text_color="#66BB6A"
+                ).pack(side="right", padx=10, pady=5)
+        elif vista == "Relación de Transacciones (Auditoría)":
+            pagos = self.app.cache_reporte.get("pagos_detalle", [])
+            if not pagos:
+                if hasattr(self, "frame_pag_rep_fin"):
+                    for w in self.frame_pag_rep_fin.winfo_children():
+                        w.destroy()
+                ctk.CTkLabel(
+                    self.frame_rep_finanzas,
+                    text="No hay transacciones registradas para el periodo o filtro seleccionado.",
+                    text_color="gray60",
+                    font=ctk.CTkFont(size=12)
+                ).pack(pady=25)
+                return
+
+            inicio, fin = crear_controles_paginacion(
+                self.frame_pag_rep_fin,
+                self.pag_rep_fin,
+                len(pagos),
+                self.ITEMS_POR_PAGINA,
+                self._cambiar_pagina_rep_fin,
+            )
+
+            # Barra resumen de auditoría
+            total_tx = len(pagos)
+            monto_acumulado = sum(float(p.get("monto", 0.0)) for p in pagos)
+            frame_header_audit = ctk.CTkFrame(self.frame_rep_finanzas, fg_color="#1E293B", corner_radius=6)
+            frame_header_audit.pack(fill="x", padx=3, pady=(2, 6))
+            ctk.CTkLabel(
+                frame_header_audit,
+                text=f"📋 Relación de Auditoría: {total_tx} transacciones conciliadas   |   Monto Acumulado: ${monto_acumulado:,.2f}",
+                font=ctk.CTkFont(size=11, weight="bold"),
+                text_color="#38BDF8"
+            ).pack(pady=5)
+
+            for p in pagos[inicio:fin]:
+                card = ctk.CTkFrame(self.frame_rep_finanzas)
+                card.pack(fill="x", padx=3, pady=3)
+
+                info = ctk.CTkFrame(card, fg_color="transparent")
+                info.pack(side="left", fill="x", expand=True, padx=8, pady=5)
+
+                metodo = p.get("metodo_pago", "Efectivo")
+                es_efec = "efectivo" in metodo.lower()
+                color_met = "#81C784" if es_efec else "#38BDF8"
+
+                ctk.CTkLabel(
+                    info,
+                    text=f"Transacción #{p['id_pago']}  |  Folio #{p['id_reserva']} (Hab. {p['habitaciones']})  |  {p['huesped']}",
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                    anchor="w"
+                ).pack(fill="x")
+
+                ctk.CTkLabel(
+                    info,
+                    text=f"Cajero: {p.get('cajero', '')}   |   Fecha: {p.get('fecha_creacion', '')}   |   Método: {metodo}",
+                    font=ctk.CTkFont(size=10),
+                    text_color=color_met,
+                    anchor="w"
+                ).pack(fill="x")
+
+                token_completo = p.get("token_auditoria") or metodo
+                ctk.CTkLabel(
+                    info,
+                    text=f"🔑 Conciliación / Token Bancario: {token_completo}",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="#FBBF24" if not es_efec else "gray70",
                     anchor="w"
                 ).pack(fill="x")
 

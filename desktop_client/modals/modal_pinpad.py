@@ -73,7 +73,7 @@ def abrir_simulador_terminal_pinpad(padre, id_reserva: int, monto: float, al_aut
         token_corto = uuid.uuid4().hex[:8].upper()
         metodo_token = f"Tarjeta Chip ****7390 (Tok: {token_corto})"
         lbl_estado_lcd.configure(
-            text=f"✅ APROBADA CON NIP\nToken: tok_chip_{token_corto}",
+            text=f"✅ APROBADA CON NIP\nAutorización: ****{token_corto[-4:]}",
             text_color="#00E676"
         )
         modal.update_idletasks()
@@ -94,7 +94,7 @@ def abrir_simulador_terminal_pinpad(padre, id_reserva: int, monto: float, al_aut
         token_corto = uuid.uuid4().hex[:8].upper()
         metodo_token = f"Tarjeta NFC ****4821 (Tok: {token_corto})"
         lbl_estado_lcd.configure(
-            text=f"✅ APROBADA SIN CONTACTO (NFC)\nToken: tok_nfc_{token_corto}",
+            text=f"✅ APROBADA SIN CONTACTO (NFC)\nAutorización: ****{token_corto[-4:]}",
             text_color="#00E676"
         )
         modal.update_idletasks()

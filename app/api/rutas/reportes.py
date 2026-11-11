@@ -9,6 +9,7 @@ from app.models.reservas_folios import ReservaFolio
 from app.models.finanzas import Cargo, Pago
 from app.models.mantenimiento import TicketMantenimiento
 from app.models.usuarios import Usuario
+from app.core.security import enmascarar_token_pago
 
 router = APIRouter()
 
@@ -110,6 +111,8 @@ def obtener_resumen_reportes(
             else (f"Huésped #{res_obj.id_huesped}" if res_obj else "General")
         )
         cajero_str = usuarios_map.get(p.id_usuario) or usuario_actual.nombre
+        es_admin = getattr(usuario_actual, "id_rol", None) == 1
+        metodo_mostrar = metodo if es_admin else enmascarar_token_pago(metodo)
 
         pagos_filtrados.append(
             {
@@ -117,10 +120,11 @@ def obtener_resumen_reportes(
                 "id_reserva": p.id_reserva,
                 "habitaciones": hab_str,
                 "huesped": huesped_str,
-                "metodo_pago": metodo,
+                "metodo_pago": metodo_mostrar,
                 "monto": monto_p,
                 "cajero": cajero_str,
                 "fecha_creacion": p.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if p.fecha_creacion else "",
+                "token_auditoria": metodo if es_admin else None,
             }
         )
 

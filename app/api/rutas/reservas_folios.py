@@ -7,6 +7,7 @@ from app.models.habitaciones import EstadoHabitacion
 from app.models.finanzas import Cargo
 from app.schemas.reservas_folios import ReservaCrear, ReservaRespuesta
 from app.crud import crud_reservas_folios, crud_habitaciones
+from app.core.security import enmascarar_token_pago
 
 router = APIRouter()
 
@@ -68,7 +69,11 @@ def obtener_detalle_reserva(
         "pagos": [
             {
                 "id_pago": p.id_pago,
-                "metodo_pago": p.metodo_pago,
+                "metodo_pago": (
+                    enmascarar_token_pago(p.metodo_pago)
+                    if getattr(usuario_actual, "id_rol", None) != 1
+                    else p.metodo_pago
+                ),
                 "monto": float(p.monto),
                 "fecha_creacion": p.fecha_creacion.strftime("%Y-%m-%d %H:%M") if p.fecha_creacion else "",
             }
