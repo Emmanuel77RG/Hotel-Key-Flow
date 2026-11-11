@@ -67,19 +67,19 @@ def usuarios_prueba(db_session):
     """Crea y retorna usuarios con roles 1 (Admin), 2 (Recepción) y 3 (Limpieza)."""
     pw_hash = security.get_password_hash("Password123*")
     
-    admin = db_session.query(Usuario).filter(Usuario.email == "admin@keyflow.test").first()
+    admin = db_session.query(Usuario).filter(Usuario.email == "admin@hotelkeyflow.com").first()
     if not admin:
-        admin = Usuario(nombre="Admin Test", email="admin@keyflow.test", password_hash=pw_hash, id_rol=1, estado_activo=True)
+        admin = Usuario(nombre="Admin Test", email="admin@hotelkeyflow.com", password_hash=pw_hash, id_rol=1, estado_activo=True)
         db_session.add(admin)
 
-    recep = db_session.query(Usuario).filter(Usuario.email == "recepcion@keyflow.test").first()
+    recep = db_session.query(Usuario).filter(Usuario.email == "recepcion@hotelkeyflow.com").first()
     if not recep:
-        recep = Usuario(nombre="Recep Test", email="recepcion@keyflow.test", password_hash=pw_hash, id_rol=2, estado_activo=True)
+        recep = Usuario(nombre="Recep Test", email="recepcion@hotelkeyflow.com", password_hash=pw_hash, id_rol=2, estado_activo=True)
         db_session.add(recep)
 
-    limp = db_session.query(Usuario).filter(Usuario.email == "limpieza@keyflow.test").first()
+    limp = db_session.query(Usuario).filter(Usuario.email == "limpieza@hotelkeyflow.com").first()
     if not limp:
-        limp = Usuario(nombre="Limp Test", email="limpieza@keyflow.test", password_hash=pw_hash, id_rol=3, estado_activo=True)
+        limp = Usuario(nombre="Limp Test", email="limpieza@hotelkeyflow.com", password_hash=pw_hash, id_rol=3, estado_activo=True)
         db_session.add(limp)
 
     db_session.commit()
