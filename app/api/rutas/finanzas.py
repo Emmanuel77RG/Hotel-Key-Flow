@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from app.api.dependencias import get_db, get_usuario_actual
+from app.api.dependencias import get_db, get_usuario_actual, exigir_rol_recepcion_o_admin
 from app.schemas.finanzas import (
     CargoCrear,
     CargoRespuesta,
@@ -29,7 +29,7 @@ def listar_cargos(
 def crear_cargo(
     cargo: CargoCrear,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=cargo.id_reserva)
     if not reserva:
@@ -60,7 +60,7 @@ def listar_pagos(
 def crear_pago(
     pago: PagoCrear,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=pago.id_reserva)
     if not reserva:
@@ -95,7 +95,7 @@ def crear_pago(
 def timbrar_factura_pac(
     datos_factura: FacturaSolicitar,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=datos_factura.id_reserva)
     if not reserva:

@@ -1,7 +1,8 @@
+from datetime import date
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from app.api.dependencias import get_db, get_usuario_actual
+from app.api.dependencias import get_db, get_usuario_actual, requerir_rol, exigir_rol_recepcion_o_admin
 from app.models.habitaciones import EstadoHabitacion
 from app.models.finanzas import Cargo
 from app.schemas.reservas_folios import ReservaCrear, ReservaRespuesta
@@ -79,14 +80,20 @@ def obtener_detalle_reserva(
 def crear_reserva(
     reserva: ReservaCrear,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     
     # Lógica de negocio (F1SP3)
     # Asignar automáticamente el empleado autenticado (auditoría de sesión activa)
     reserva.id_usuario = usuario_actual.id_usuario
     
-    # Validación de coherencia cronológica
+    # Validación de coherencia cronológica y prevención de fechas pasadas (RF-RES-003)
+    if reserva.fecha_entrada < date.today():
+        raise HTTPException(
+            status_code=400,
+            detail="No se pueden registrar reservas con fechas de entrada en el pasado."
+        )
+
     if reserva.fecha_salida <= reserva.fecha_entrada:
         raise HTTPException(
             status_code=400, 
@@ -127,7 +134,7 @@ def crear_reserva(
 def realizar_checkin(
     reserva_id: int,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
@@ -183,7 +190,7 @@ def realizar_checkin(
 def realizar_checkout(
     reserva_id: int,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
@@ -224,7 +231,7 @@ def realizar_checkout(
 def cancelar_reserva(
     reserva_id: int,
     db: Session = Depends(get_db),
-    usuario_actual=Depends(get_usuario_actual),
+    usuario_actual=Depends(exigir_rol_recepcion_o_admin),
 ):
     reserva = crud_reservas_folios.obtener_reserva(db, reserva_id=reserva_id)
     if not reserva:
