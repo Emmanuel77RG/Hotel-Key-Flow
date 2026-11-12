@@ -71,3 +71,13 @@ CREATE TABLE pagos (
     id_usuario INTEGER REFERENCES usuarios(id_usuario), -- Quien cobró
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 8. Tabla de Productos y Servicios del Punto de Venta (POS)
+CREATE TABLE productos_pos (
+    id_producto SERIAL PRIMARY KEY,
+    nombre VARCHAR(120) NOT NULL,
+    categoria VARCHAR(60) NOT NULL DEFAULT 'Restaurante / Alimentos',
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    disponible BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

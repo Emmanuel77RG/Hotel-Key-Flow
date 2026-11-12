@@ -8,7 +8,8 @@ from app.models import (
     huespedes as huespedes_model,
     reservas_folios as reservas_model,
     mantenimiento as mantenimiento_model,
-    finanzas as finanzas_model
+    finanzas as finanzas_model,
+    pos as pos_model
 )
 from app.api.rutas import (
     usuarios,
@@ -17,7 +18,9 @@ from app.api.rutas import (
     huespedes,
     reservas_folios,
     mantenimiento,
-    finanzas
+    finanzas,
+    pos,
+    reportes
 )
 
 # CREA LAS TABLAS AUTOMÁTICAMENTE AL ARRANCAR
@@ -43,6 +46,8 @@ app.include_router(huespedes.router, prefix="/huespedes", tags=["Gestión de Hu�
 app.include_router(reservas_folios.router, prefix="/reservas", tags=["Gestión de Reservas"])
 app.include_router(mantenimiento.router, prefix="/mantenimiento", tags=["Tickets de Mantenimiento"])
 app.include_router(finanzas.router, prefix="/finanzas", tags=["Cargos y Pagos"])
+app.include_router(pos.router, prefix="/pos", tags=["Punto de Venta (Restaurante y Room Service)"])
+app.include_router(reportes.router, prefix="/reportes", tags=["Reportes Operativos y Corte de Caja"])
 
 # Ruta de comprobación de estado
 @app.get("/", tags=["Status"])

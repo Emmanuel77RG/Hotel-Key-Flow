@@ -5,3 +5,5 @@ __pycache__/
 .env
 *.sqlite3
 facturas_emitidas/
+desktop_client/reportes_pdf/
+*.session.sql
