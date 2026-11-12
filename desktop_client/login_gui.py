@@ -1,4 +1,6 @@
+import os
 import customtkinter as ctk
+from PIL import Image
 import requests
 from tkinter import messagebox
 from main_panel_gui import PanelPrincipal
@@ -15,9 +17,18 @@ class VentanaLogin(ctk.CTk):
         self.geometry("400x500")
         self.resizable(False, False)
         
-        # Título
-        self.label_titulo = ctk.CTkLabel(self, text="Hotel KeyFlow", font=ctk.CTkFont(size=32, weight="bold"))
-        self.label_titulo.pack(pady=(60, 40))
+        # Logo del sistema
+        ruta_assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+        ruta_dark = os.path.join(ruta_assets, "logo_dark.png")
+        ruta_light = os.path.join(ruta_assets, "logo_light.png")
+        if os.path.exists(ruta_dark):
+            img_dark = Image.open(ruta_dark)
+            img_light = Image.open(ruta_light) if os.path.exists(ruta_light) else img_dark
+            self.logo_ctk = ctk.CTkImage(light_image=img_light, dark_image=img_dark, size=(240, 94))
+            self.label_titulo = ctk.CTkLabel(self, text="", image=self.logo_ctk)
+        else:
+            self.label_titulo = ctk.CTkLabel(self, text="Hotel KeyFlow", font=ctk.CTkFont(size=32, weight="bold"))
+        self.label_titulo.pack(pady=(50, 35))
         
         # Campo Correo
         self.entry_email = ctk.CTkEntry(self, placeholder_text="Correo electrónico", width=280, height=40)
