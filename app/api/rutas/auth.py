@@ -21,6 +21,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             detail="Correo o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Verificamos si el usuario está activo (borrado lógico RF-ADM-003)
+    if not usuario.estado_activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta cuenta de usuario se encuentra desactivada.",
+        )
     
     # Si todo está bien, generamos su token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

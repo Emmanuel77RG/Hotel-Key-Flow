@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 from app.models.habitaciones import EstadoHabitacion
 
@@ -9,6 +10,13 @@ class HabitacionBase(BaseModel):
 
 class HabitacionCrear(HabitacionBase):
     pass
+
+class HabitacionActualizar(BaseModel):
+    numero_habitacion: Optional[str] = None
+    tipo: Optional[str] = None
+    capacidad: Optional[int] = None
+    precio_base: Optional[float] = None
+    estado: Optional[EstadoHabitacion] = None
 
 class HabitacionEstadoUpdate(BaseModel):
     estado: EstadoHabitacion

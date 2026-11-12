@@ -61,6 +61,8 @@ class VentanaLogin(ctk.CTk):
                 
             elif respuesta.status_code == 401:
                 messagebox.showerror("Acceso Denegado", "Correo o contraseña incorrectos.")
+            elif respuesta.status_code == 403:
+                messagebox.showerror("Cuenta Desactivada", "Esta cuenta de usuario se encuentra desactivada. Contacta al Administrador.")
             else:
                 messagebox.showerror("Error", f"Error del servidor: {respuesta.status_code}")
                 
