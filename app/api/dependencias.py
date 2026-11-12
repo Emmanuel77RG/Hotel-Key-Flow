@@ -47,13 +47,28 @@ def get_usuario_actual(
     return usuario
 
 
-# Dependencia RBAC: Exige que el usuario autenticado tenga rol de Administrador (id_rol == 1)
-def exigir_rol_admin(usuario_actual=Depends(get_usuario_actual)):
-    if usuario_actual.id_rol != 1:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado: se requieren permisos de Administrador",
-        )
-    return usuario_actual
+# Fábrica de dependencias RBAC: Exige roles específicos y devuelve HTTP 403 Forbidden
+def requerir_rol(*roles_permitidos: int):
+    """
+    Fábrica de dependencias RBAC (Role-Based Access Control).
+    Exige que el usuario autenticado posea al menos uno de los roles indicados.
+    Si el rol del usuario no está autorizado, interrumpe con HTTP 403 FORBIDDEN.
+    """
+    def _verificador_rol(usuario_actual=Depends(get_usuario_actual)):
+        if usuario_actual.id_rol not in roles_permitidos:
+            roles_txt = ", ".join(str(r) for r in roles_permitidos)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado: permisos insuficientes para esta operación (roles requeridos: [{roles_txt}]).",
+            )
+        return usuario_actual
+
+    return _verificador_rol
+
+
+# Accesos directos convenientes para inyección de dependencias
+exigir_rol_admin = requerir_rol(1)
+exigir_rol_recepcion_o_admin = requerir_rol(1, 2)
+
 
 

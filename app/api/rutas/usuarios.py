@@ -1,7 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text  # <-- 1. Agrega esta importación
 from app.schemas import usuarios as schemas
 from app.crud import crud_usuarios
 from app.api.dependencias import get_db, exigir_rol_admin
@@ -64,10 +63,3 @@ def cambiar_estado_usuario(
     if not usuario_actualizado:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return usuario_actualizado
-
-@router.post("/setup-roles")
-def inicializar_roles(db: Session = Depends(get_db)):
-    # Ajusta "nombre" por el nombre real de tu columna en la tabla roles si es distinto
-    db.execute(text("INSERT INTO roles (id_rol, nombre_rol) VALUES (1, 'Administrador');"))
-    db.commit()
-    return {"msg": "Rol creado de forma segura"}

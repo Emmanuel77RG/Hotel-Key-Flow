@@ -7,8 +7,8 @@ from sqlalchemy.orm import relationship
 reservas_habitaciones = Table(
     "reservas_habitaciones",
     Base.metadata,
-    Column("id_reserva", Integer, ForeignKey("reservas_folios.id_reserva", ondelete="CASCADE"), primary_key=True),
-    Column("id_habitacion", Integer, ForeignKey("habitaciones.id_habitacion", ondelete="CASCADE"), primary_key=True)
+    Column("id_reserva", Integer, ForeignKey("reservas_folios.id_reserva", ondelete="RESTRICT"), primary_key=True),
+    Column("id_habitacion", Integer, ForeignKey("habitaciones.id_habitacion", ondelete="RESTRICT"), primary_key=True)
 )
 
 class ReservaFolio(Base):

@@ -1,12 +1,24 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-# Variables globales de configuración
-SQLALCHEMY_DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "postgresql://admin:adminpsw@localhost:5432/hotel_keyflow",
-)
+# Cargar variables de entorno desde el archivo .env en la raíz del proyecto
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-hotel-keyflow-cambiar-en-produccion")
-ALGORITHM: str = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+SQLALCHEMY_DATABASE_URL: str = os.getenv("DATABASE_URL")
+if not SQLALCHEMY_DATABASE_URL:
+    raise RuntimeError(
+        "CRITICAL: La variable de entorno DATABASE_URL no está definida. "
+        "Por favor configura tu archivo .env basado en .env.example."
+    )
 
+SECRET_KEY: str = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "CRITICAL: La variable de entorno SECRET_KEY no está definida. "
+        "Por favor configura tu archivo .env basado en .env.example."
+    )
+
+ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))

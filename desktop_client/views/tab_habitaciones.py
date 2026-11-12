@@ -181,7 +181,15 @@ class TabHabitacionesView:
                 if hasattr(self.app, "actualizar_combo_habitaciones_mantenimiento"):
                     self.app.actualizar_combo_habitaciones_mantenimiento(lista_habs)
         except requests.exceptions.ConnectionError:
-            pass
+            if self.frame_lista is not None and self.frame_lista.winfo_exists():
+                for widget in self.frame_lista.winfo_children():
+                    widget.destroy()
+                ctk.CTkLabel(
+                    self.frame_lista,
+                    text="⚠️ Error de Conexión: No se pudo contactar con el servidor.\nVerifica que la API de Hotel KeyFlow esté encendida.",
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="#EF5350"
+                ).pack(pady=40, padx=20)
 
     def crear_tarjeta_habitacion(self, habitacion):
         color_fondo = self.COLORES_ESTADO.get(habitacion['estado'], "#424242")
@@ -263,6 +271,7 @@ class TabHabitacionesView:
             if respuesta.status_code == 200:
                 self.cargar_habitaciones()
             else:
-                messagebox.showerror("Error API", "No se pudo actualizar el estado.")
+                detalle = respuesta.json().get("detail", "Transición no permitida.") if respuesta.headers.get("content-type", "").startswith("application/json") else respuesta.text
+                messagebox.showerror("Error al cambiar estado", f"No se pudo actualizar el estado:\n{detalle}")
         except requests.exceptions.ConnectionError:
             messagebox.showerror("Error", "No hay conexión con el servidor.")

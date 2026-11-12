@@ -1,6 +1,7 @@
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
+from datetime import datetime
 
 def _validar_rfc_opcional(v: Optional[str]) -> Optional[str]:
     if v is None:
@@ -16,8 +17,8 @@ def _validar_rfc_opcional(v: Optional[str]) -> Optional[str]:
     return limpio
 
 class HuespedBase(BaseModel):
-    documento_identidad: Optional[str] = "Sin especificar"
-    nombre_completo: str
+    documento_identidad: str = Field(..., min_length=3, max_length=50, description="Identificación oficial única (INE/Pasaporte)")
+    nombre_completo: str = Field(..., min_length=2, max_length=150, description="Nombre completo del huésped")
     email: Optional[str] = None
     telefono: Optional[str] = None
     rfc: Optional[str] = None
@@ -31,8 +32,8 @@ class HuespedCrear(HuespedBase):
     pass
 
 class HuespedActualizar(BaseModel):
-    documento_identidad: Optional[str] = None
-    nombre_completo: Optional[str] = None
+    documento_identidad: Optional[str] = Field(None, min_length=3, max_length=50)
+    nombre_completo: Optional[str] = Field(None, min_length=2, max_length=150)
     email: Optional[str] = None
     telefono: Optional[str] = None
     rfc: Optional[str] = None
@@ -44,6 +45,7 @@ class HuespedActualizar(BaseModel):
 
 class HuespedRespuesta(HuespedBase):
     id_huesped: int
+    fecha_creacion: Optional[datetime] = None
 
     class Config:
         from_attributes = True
