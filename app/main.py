@@ -26,6 +26,9 @@ try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE huespedes ADD COLUMN IF NOT EXISTS rfc VARCHAR(20);"))
         conn.execute(text("ALTER TABLE pagos ALTER COLUMN metodo_pago TYPE VARCHAR(100);"))
+        conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS categoria VARCHAR(50) DEFAULT 'General';"))
+        conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS prioridad VARCHAR(30) DEFAULT 'Media';"))
+        conn.execute(text("ALTER TABLE tickets_mantenimiento ADD COLUMN IF NOT EXISTS nota_resolucion VARCHAR(255);"))
 except Exception:
     pass
 
